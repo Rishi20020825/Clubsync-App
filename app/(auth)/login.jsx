@@ -52,7 +52,7 @@ export default function LoginScreen() {
       // Save token/user info as needed
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
-      router.replace('/(tabs)');
+      router.replace('/dashboard');
     } catch (err) {
       setError(err.message);
     }
@@ -72,7 +72,7 @@ export default function LoginScreen() {
       if (!res.ok) throw new Error(data.error || 'Google login failed');
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
-      router.replace('/(tabs)');
+      router.replace('/dashboard');
     } catch (err) {
       setError(err.message);
     }
