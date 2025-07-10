@@ -3,7 +3,10 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import EventsScreen from './(tabs)/events';
+import ProfileScreen from './(tabs)/profile';
 import { useRouter } from 'expo-router';
+import  {  useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const TABS = [
   { key: 'home', label: 'Home', icon: 'home' },
@@ -14,6 +17,17 @@ const TABS = [
 ];
 
 export default function Dashboard() {
+  const [user, setUser] = useState({});
+
+useEffect(() => {
+  const fetchUser = async () => {
+    const userData = await AsyncStorage.getItem('user');
+    if (userData) {
+      setUser(JSON.parse(userData));
+    }
+  };
+  fetchUser();
+}, []);
   const [activeTab, setActiveTab] = useState('home');
   const router = useRouter();
 
@@ -23,7 +37,9 @@ export default function Dashboard() {
       case 'home':
         return (
           <View style={styles.centerContent}>
-            <Text style={styles.heading}>Welcome to Your Dashboard</Text>
+            <Text style={styles.heading}>
+            Welcome{user?.name ? `, ${user.name}` : ''}!
+      </Text>
             <Text style={styles.subheading}>Quick stats, upcoming events, and more will appear here.</Text>
           </View>
         );
@@ -44,12 +60,7 @@ export default function Dashboard() {
           </View>
         );
       case 'profile':
-        return (
-          <View style={styles.centerContent}>
-            <Text style={styles.heading}>Profile</Text>
-            <Text style={styles.subheading}>User info and settings will be shown here.</Text>
-          </View>
-        );
+        return <ProfileScreen/>;
       default:
         return null;
     }
