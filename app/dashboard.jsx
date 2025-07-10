@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import {View, Text, TouchableOpacity, StyleSheet, Image} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import EventsScreen from './(tabs)/events';
@@ -35,14 +35,28 @@ useEffect(() => {
   const renderContent = () => {
     switch (activeTab) {
       case 'home':
-        return (
-          <View style={styles.centerContent}>
-            <Text style={styles.heading}>
-            Welcome{user?.name ? `, ${user.name}` : ''}!
-      </Text>
-            <Text style={styles.subheading}>Quick stats, upcoming events, and more will appear here.</Text>
-          </View>
-        );
+          return (
+            <View style={styles.centerContent}>
+              <Text style={styles.heading}>
+                Welcome{user?.name ? `, ${user.name}` : ''}!
+              </Text>
+              <Text style={styles.subheading}>Quick stats, upcoming events, and more will appear here.</Text>
+              <TouchableOpacity style={styles.electionCard} onPress={() => router.push('/election')}>
+                <Image
+                    source={require('../assets/vote.jpg')}
+                    style={styles.electionCardImage}
+                />
+                <View style={styles.electionCardContent}>
+                  <Text style={styles.electionCardTitle}>Mock Election 2025</Text>
+                  <Text style={styles.electionCardSubtitle}>by ClubSync</Text>
+                  <View style={styles.electionCardBadge}>
+                    <Text style={styles.electionCardBadgeText}>Vote Now</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+            </View>
+          );
       case 'events':
         return <EventsScreen />;
       case 'clubs':
@@ -146,5 +160,52 @@ const styles = StyleSheet.create({
   content: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, paddingTop: 48 },
   centerContent: { alignItems: 'center', justifyContent: 'center' },
   heading: { fontSize: 28, fontWeight: 'bold', color: '#222', marginBottom: 12 },
-  subheading: { color: '#666', fontSize: 16, textAlign: 'center' },
+  subheading: { color: '#666', fontSize: 16, textAlign: 'center'
+  },
+  electionCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    marginTop: 24,
+    overflow: 'hidden',
+    width: 200,
+    alignSelf: 'center',
+  },
+  electionCardImage: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#f3f4f6',
+  },
+  electionCardContent: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  electionCardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#222',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  electionCardSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  electionCardBadge: {
+    backgroundColor: '#fb923c',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+  },
+  electionCardBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
 }); 
