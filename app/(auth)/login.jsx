@@ -7,9 +7,13 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
-import {GOOGLE_CLIENT_ID} from '@env';
+import {GOOGLE_CLIENT_ID, API_BASE_URL} from '@env';
 
-const API_BASE_URL = 'http://192.168.43.88:3000'; // <-- Local backend URL for real device
+
+// 1. Run ipconfig on your terminal
+// 2. Find ip address under the section "Wireless LAN adapter Wi-Fi"
+// 3. Copy and paste it on .env file like following
+// API_BASE_URL=http://192.168.8.157:3000
 
 // Complete the auth session
 WebBrowser.maybeCompleteAuthSession();

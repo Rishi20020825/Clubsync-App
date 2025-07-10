@@ -3,8 +3,8 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import {API_BASE_URL} from '@env';
 
-const API_BASE_URL = 'http://192.168.43.88:3000'; // <-- Local backend URL for real device
 
 export default function RegisterScreen() {
   const [form, setForm] = useState({
@@ -194,4 +194,4 @@ const styles = StyleSheet.create({
   button: { backgroundColor: '#fb923c', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 8 },
   buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   linkCenter: { color: '#fb923c', textAlign: 'center', marginTop: 8, fontWeight: 'bold' },
-}); 
+});
