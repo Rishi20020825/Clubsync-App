@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
+import {GOOGLE_CLIENT_ID} from '@env';
 
 const API_BASE_URL = 'http://192.168.43.88:3000'; // <-- Local backend URL for real device
 
@@ -22,10 +23,10 @@ export default function LoginScreen() {
 
   // Google Auth Request - Using the same Client ID for all platforms
   const [request, response, promptAsync] = Google.useAuthRequest({
-    expoClientId: '237625576689-5oeqqdg65ocgepv2bfotise76luhg0fg.apps.googleusercontent.com',
-    iosClientId: '237625576689-5oeqqdg65ocgepv2bfotise76luhg0fg.apps.googleusercontent.com',
-    androidClientId: '237625576689-5oeqqdg65ocgepv2bfotise76luhg0fg.apps.googleusercontent.com',
-    webClientId: '237625576689-5oeqqdg65ocgepv2bfotise76luhg0fg.apps.googleusercontent.com',
+    expoClientId: GOOGLE_CLIENT_ID,
+    iosClientId: GOOGLE_CLIENT_ID,
+    androidClientId: GOOGLE_CLIENT_ID,
+    webClientId: GOOGLE_CLIENT_ID,
   });
 
   // Handle Google Sign-In Response
