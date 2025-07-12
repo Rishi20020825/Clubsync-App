@@ -145,7 +145,7 @@ const CastVotePage = () => {
                 }))
             };
 
-            const response = await fetch(`${API_BASE_URL}/api/voting/vote`, {
+            const response = await fetch(`${API_BASE_URL}/api/voting/submit-vote`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -161,7 +161,7 @@ const CastVotePage = () => {
 
                 // Navigate to confirmation page
                 router.push({
-                    pathname: '/election/confirmation',
+                    pathname: '/dashboard',
                     params: {
                         success: true,
                         votesCount: result.votesCount
@@ -261,7 +261,6 @@ const CastVotePage = () => {
                 </View>
 
                 <Text style={styles.sectionTitle}>Select Your Candidate</Text>
-                <Text style={styles.sectionSubtitle}>Tap on a candidate to view details and select</Text>
 
                 <View style={styles.candidatesContainer}>
                     {currentPosition.candidates.map(candidate => (
@@ -471,11 +470,6 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '600',
         color: '#111827',
-        marginBottom: 4,
-    },
-    sectionSubtitle: {
-        fontSize: 14,
-        color: '#6b7280',
         marginBottom: 16,
     },
     candidatesContainer: {

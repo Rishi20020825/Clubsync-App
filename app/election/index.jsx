@@ -107,24 +107,6 @@ export default function ElectionPage() {
         { id: 8, title: "Social Media Manager", icon: "instagram", candidates: 1, color: "#6366f1" },
     ];
 
-    const features = [
-        {
-            icon: <MaterialCommunityIcons name="shield-check" size={20} color="#f97316" />,
-            title: "Secure Voting",
-            desc: "End-to-end encrypted ballots for maximum security"
-        },
-        {
-            icon: <MaterialIcons name="privacy-tip" size={20} color="#f97316" />,
-            title: "Anonymous",
-            desc: "Your votes are completely anonymous"
-        },
-        {
-            icon: <FontAwesome name="qrcode" size={20} color="#f97316" />,
-            title: "Quick Results",
-            desc: "Instant results after voting closes"
-        }
-    ];
-
     return (
         <LinearGradient colors={['#fff7ed', '#fff', '#fff']} style={styles.gradient}>
             <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -217,18 +199,6 @@ export default function ElectionPage() {
                                     </View>
                                     <Text style={styles.progressText}>65% of members have voted</Text>
                                 </View>
-                            </View>
-
-                            <View style={styles.featuresGrid}>
-                                {features.map((feature, index) => (
-                                    <View key={index} style={styles.featureCard}>
-                                        <View style={styles.featureIcon}>
-                                            {feature.icon}
-                                        </View>
-                                        <Text style={styles.featureTitle}>{feature.title}</Text>
-                                        <Text style={styles.featureDesc}>{feature.desc}</Text>
-                                    </View>
-                                ))}
                             </View>
 
                             <View style={styles.actionSection}>
@@ -479,12 +449,6 @@ const styles = StyleSheet.create({
     progressText: {
         fontSize: 14,
         color: '#6b7280',
-    },
-    featuresGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        marginBottom: 24,
     },
     featureCard: {
         width: '100%',
