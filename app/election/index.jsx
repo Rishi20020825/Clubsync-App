@@ -41,6 +41,8 @@ export default function ElectionPage() {
             if (response.ok) {
                 // Store the voting token and navigate to voting page
                 await AsyncStorage.setItem('votingToken', data.token);
+                // set election ID in storage if needed
+                await AsyncStorage.setItem('currentElectionId', String(1)); // Replace with actual election ID
                 router.push('/election/voting');
             } else {
                 Alert.alert('Error', data.error || 'Failed to issue voting token');
@@ -103,24 +105,6 @@ export default function ElectionPage() {
         { id: 6, title: "Marketing Director", icon: "bullhorn", candidates: 2, color: "#8b5cf6" },
         { id: 7, title: "Tech Lead", icon: "code-braces", candidates: 2, color: "#ec4899" },
         { id: 8, title: "Social Media Manager", icon: "instagram", candidates: 1, color: "#6366f1" },
-    ];
-
-    const features = [
-        {
-            icon: <MaterialCommunityIcons name="shield-check" size={20} color="#f97316" />,
-            title: "Secure Voting",
-            desc: "End-to-end encrypted ballots for maximum security"
-        },
-        {
-            icon: <MaterialIcons name="privacy-tip" size={20} color="#f97316" />,
-            title: "Anonymous",
-            desc: "Your votes are completely anonymous"
-        },
-        {
-            icon: <FontAwesome name="qrcode" size={20} color="#f97316" />,
-            title: "Quick Results",
-            desc: "Instant results after voting closes"
-        }
     ];
 
     return (
@@ -215,18 +199,6 @@ export default function ElectionPage() {
                                     </View>
                                     <Text style={styles.progressText}>65% of members have voted</Text>
                                 </View>
-                            </View>
-
-                            <View style={styles.featuresGrid}>
-                                {features.map((feature, index) => (
-                                    <View key={index} style={styles.featureCard}>
-                                        <View style={styles.featureIcon}>
-                                            {feature.icon}
-                                        </View>
-                                        <Text style={styles.featureTitle}>{feature.title}</Text>
-                                        <Text style={styles.featureDesc}>{feature.desc}</Text>
-                                    </View>
-                                ))}
                             </View>
 
                             <View style={styles.actionSection}>
@@ -477,12 +449,6 @@ const styles = StyleSheet.create({
     progressText: {
         fontSize: 14,
         color: '#6b7280',
-    },
-    featuresGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        marginBottom: 24,
     },
     featureCard: {
         width: '100%',
