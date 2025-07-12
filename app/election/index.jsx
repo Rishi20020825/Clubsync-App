@@ -41,6 +41,8 @@ export default function ElectionPage() {
             if (response.ok) {
                 // Store the voting token and navigate to voting page
                 await AsyncStorage.setItem('votingToken', data.token);
+                // set election ID in storage if needed
+                await AsyncStorage.setItem('currentElectionId', String(1)); // Replace with actual election ID
                 router.push('/election/voting');
             } else {
                 Alert.alert('Error', data.error || 'Failed to issue voting token');
