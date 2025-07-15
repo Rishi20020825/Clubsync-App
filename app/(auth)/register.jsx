@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import {API_BASE_URL} from '@env';
+import { netconfig } from "../../netconfig";
 
 
 export default function RegisterScreen() {
@@ -30,7 +30,7 @@ export default function RegisterScreen() {
     if (Object.keys(errs).length) return;
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/users`, {
+      const res = await fetch(`${netconfig.API_BASE_URL}/api/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
