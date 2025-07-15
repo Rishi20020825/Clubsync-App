@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, MaterialCommunityIcons, FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from '@env';
+import { netconfig } from "../../netconfig";
 
 export default function ElectionPage() {
     const router = useRouter();
@@ -25,7 +25,7 @@ export default function ElectionPage() {
             }
 
             // Make API call to issue token
-            const response = await fetch(`${API_BASE_URL}/api/voting/issue-token`, {
+            const response = await fetch(`${netconfig.API_BASE_URL}/api/voting/issue-token`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${authToken}`,

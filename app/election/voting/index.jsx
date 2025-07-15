@@ -5,7 +5,7 @@ import { MaterialCommunityIcons, Feather, FontAwesome, Ionicons } from '@expo/ve
 import { useRouter } from 'expo-router';
 import * as ScreenCapture from 'expo-screen-capture';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from '@env';
+import { netconfig } from "../../../netconfig";
 
 const CastVotePage = () => {
     const router = useRouter();
@@ -64,8 +64,8 @@ const CastVotePage = () => {
 
             // Fetch positions and candidates with better error handling
             const [positionsResponse, candidatesResponse] = await Promise.all([
-                fetch(`${API_BASE_URL}/api/voting/positions?electionId=${electionId}`),
-                fetch(`${API_BASE_URL}/api/voting/candidates?electionId=${electionId}`)
+                fetch(`${netconfig.API_BASE_URL}/api/voting/positions?electionId=${electionId}`),
+                fetch(`${netconfig.API_BASE_URL}/api/voting/candidates?electionId=${electionId}`)
             ]);
 
             // Check each response individually for better error messages
@@ -145,7 +145,7 @@ const CastVotePage = () => {
                 }))
             };
 
-            const response = await fetch(`${API_BASE_URL}/api/voting/submit-vote`, {
+            const response = await fetch(`${netconfig.API_BASE_URL}/api/voting/submit-vote`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
