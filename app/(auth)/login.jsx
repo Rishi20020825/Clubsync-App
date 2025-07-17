@@ -7,14 +7,8 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
-import {GOOGLE_CLIENT_ID, API_BASE_URL} from '@env';
-
-
-// 1. Run ipconfig on your terminal
-// 2. Find ip address under the section "Wireless LAN adapter Wi-Fi"
-// 3. Copy and paste it on .env file like following
-// API_BASE_URL=http://192.168.8.157:3000
-
+import {GOOGLE_CLIENT_ID} from '@env';
+import { netconfig } from "../../netconfig";
 // Complete the auth session
 WebBrowser.maybeCompleteAuthSession();
 
@@ -49,7 +43,7 @@ export default function LoginScreen() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${API_BASE_URL}/api/mobile/signin`, {
+      const res = await fetch(`${netconfig.API_BASE_URL}/api/mobile/signin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: form.email, password: form.password }),
@@ -70,7 +64,7 @@ export default function LoginScreen() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${API_BASE_URL}/api/mobile/signin`, {
+      const res = await fetch(`${netconfig.API_BASE_URL}/api/mobile/signin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ googleToken: idToken }),
