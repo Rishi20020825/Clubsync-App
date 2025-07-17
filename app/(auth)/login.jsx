@@ -25,6 +25,8 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const router = useRouter();
 
+
+
   // Google Auth Request - Using the same Client ID for all platforms
   const [request, response, promptAsync] = Google.useAuthRequest({
     expoClientId: GOOGLE_CLIENT_ID,

@@ -24,6 +24,7 @@ export default function RootLayout() {
             name="event/[id]" 
             options={{ title: 'Event Details' }} 
           />
+
         </Stack>
       </SafeAreaView>
     </>
