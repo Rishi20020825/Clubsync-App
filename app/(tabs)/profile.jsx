@@ -71,7 +71,7 @@ export default function ProfileScreen() {
             <Text style={styles.menuText}>Notifications</Text>
             <Text style={styles.menuArrow}>›</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/profileupdate/update-profile')}>
             <Text style={styles.menuIcon}>👤</Text>
             <Text style={styles.menuText}>Edit Profile</Text>
             <Text style={styles.menuArrow}>›</Text>
@@ -92,14 +92,14 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  
   container: {
-    flex: 1,
-    backgroundColor: '#f9fafb', 
-    width: '110%',
-    alignSelf: 'center',
-    marginTop: -50,
+  flex: 1,
+  backgroundColor: '#f9fafb',
+ 
+},
     // match Events tab
-  },
+
   scrollContent: {
     padding: 16,
     
