@@ -356,7 +356,7 @@ export default function Dashboard() {
                     colors={['#f59e0b', '#d97706']}
                     style={styles.quickActionIcon}
                   >
-                    <Feather name="vote" size={20} color="#ffffff" />
+                    <Feather name="check-square" size={20} color="#ffffff" />
                   </LinearGradient>
                   <Text style={styles.quickActionTitle}>Elections</Text>
                   <Text style={styles.quickActionSubtitle}>Cast your vote</Text>
@@ -640,7 +640,7 @@ export default function Dashboard() {
               </View>
               <View style={styles.walletStatCard}>
                 <LinearGradient colors={['#3b82f6', '#1d4ed8']} style={styles.walletStatIcon}>
-                  <Feather name="shield-check" size={20} color="#ffffff" />
+                  <Feather name="check-circle" size={20} color="#ffffff" />
                 </LinearGradient>
                 <Text style={styles.walletStatNumber}>{certificatesData.filter(cert => cert.status === 'Verified').length}</Text>
                 <Text style={styles.walletStatLabel}>Verified</Text>

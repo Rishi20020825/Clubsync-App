@@ -161,6 +161,8 @@ export default function ProfileScreen() {
               onPress={() => {
                 if (item.id === 'edit-profile') {
                   router.push('/profileupdate/update-profile');
+                } else if (item.id === 'help') {
+                  router.push('/profile/help-support');
                 }
                 // Add other navigation logic here
               }}
