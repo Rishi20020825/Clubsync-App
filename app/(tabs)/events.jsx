@@ -17,7 +17,7 @@ const MOCK_EVENTS = [
     currentVolunteers: 23,
     category: 'Environment',
     organizer: 'Green Earth Club',
-    image: 'https://via.placeholder.com/300x150/4ade80/ffffff?text=Beach+Cleanup'
+    image: 'https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=400&h=200&fit=crop&crop=center'
   },
   {
     id: 2,
@@ -30,7 +30,7 @@ const MOCK_EVENTS = [
     currentVolunteers: 8,
     category: 'Community Service',
     organizer: 'Caring Hearts Club',
-    image: 'https://via.placeholder.com/300x150/f59e0b/ffffff?text=Food+Distribution'
+    image: 'https://images.unsplash.com/photo-1593113616828-6f22bca04804?w=400&h=200&fit=crop&crop=center'
   },
   {
     id: 3,
@@ -43,7 +43,7 @@ const MOCK_EVENTS = [
     currentVolunteers: 35,
     category: 'Environment',
     organizer: 'Nature Lovers Society',
-    image: 'https://via.placeholder.com/300x150/10b981/ffffff?text=Tree+Planting'
+    image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=400&h=200&fit=crop&crop=center'
   },
   {
     id: 4,
@@ -56,7 +56,7 @@ const MOCK_EVENTS = [
     currentVolunteers: 12,
     category: 'Education',
     organizer: 'Book Buddies Club',
-    image: 'https://via.placeholder.com/300x150/8b5cf6/ffffff?text=Reading+Program'
+    image: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=200&fit=crop&crop=center'
   },
   {
     id: 5,
@@ -69,7 +69,7 @@ const MOCK_EVENTS = [
     currentVolunteers: 19,
     category: 'Animal Welfare',
     organizer: 'Animal Lovers Unite',
-    image: 'https://via.placeholder.com/300x150/ec4899/ffffff?text=Animal+Shelter'
+    image: 'https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=400&h=200&fit=crop&crop=center'
   }
 ];
 
@@ -103,15 +103,12 @@ const EventCard = ({ event, onPress }) => {
   return (
     <TouchableOpacity style={styles.eventCard} onPress={onPress}>
       <View style={styles.eventImageContainer}>
-        <LinearGradient 
-          colors={categoryGradient} 
-          style={styles.eventImagePlaceholder}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <Feather name="calendar" size={32} color="#ffffff" />
-          <Text style={styles.eventImageText}>{event.category}</Text>
-        </LinearGradient>
+        <Image 
+          source={{ uri: event.image }} 
+          style={styles.eventImage}
+          resizeMode="cover"
+        />
+        <View style={styles.imageOverlay} />
         <LinearGradient 
           colors={isFull ? ['#ef4444', '#dc2626'] : categoryGradient}
           style={styles.categoryBadge}
@@ -436,7 +433,19 @@ const styles = StyleSheet.create({
   },
   eventImageContainer: {
     position: 'relative',
-    height: 140,
+    height: 180,
+  },
+  eventImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
   },
   eventImagePlaceholder: {
     flex: 1,
