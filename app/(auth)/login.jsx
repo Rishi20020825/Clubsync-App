@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -180,7 +180,11 @@ export default function LoginScreen() {
           
           <TouchableOpacity style={styles.googleButton} onPress={() => promptAsync()}>
             <View style={styles.googleButtonContent}>
-              <FontAwesome name="google" size={20} color="#ea4335" />
+              <Image
+                source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
+                style={styles.googleIcon}
+                resizeMode="contain"
+              />
               <Text style={styles.googleButtonText}>Sign in with Google</Text>
             </View>
           </TouchableOpacity>
@@ -467,6 +471,11 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 32,
     minHeight: 56,
+  },
+  googleIcon: {
+    width: 20,
+    height: 20,
+    marginRight: 12,
   },
   googleButtonText: { 
     color: '#374151', 

@@ -44,7 +44,7 @@ export default function Dashboard() {
     {
       id: 2,
       type: 'post',
-      title: 'Music Club – Annual Night Recap 🎶',
+      title: 'Music Club - Annual Night Recap 🎶',
       description: 'Relive the magic from our Annual Music Night!',
       image: require('../assets/1.jpeg'),
       time: '2 hours ago',
@@ -52,7 +52,7 @@ export default function Dashboard() {
     {
       id: 3,
       type: 'event',
-      title: 'Hackathon 2025 – Register Now!',
+      title: 'Hackathon 2025 - Register Now!',
       description: 'Solve real-world problems in 24 hours. Prizes worth $5000!',
       image: require('../assets/2.png'),
       time: '4 hours ago',
