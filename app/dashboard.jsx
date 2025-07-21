@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,6 +7,8 @@ import EventsScreen from './(tabs)/events';
 import ProfileScreen from './(tabs)/profile';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const { width } = Dimensions.get('window');
 
 const TABS = [
   { key: 'home', label: 'Home', icon: 'home' },
@@ -23,9 +25,18 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchUser = async () => {
-      const userData = await AsyncStorage.getItem('user');
-      if (userData) {
-        setUser(JSON.parse(userData));
+      try {
+        const userData = await AsyncStorage.getItem('user');
+        console.log('Retrieved user data:', userData);
+        if (userData) {
+          const parsedUser = JSON.parse(userData);
+          console.log('Parsed user:', parsedUser);
+          setUser(parsedUser);
+        } else {
+          console.log('No user data found in AsyncStorage');
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
       }
     };
     fetchUser();
@@ -240,100 +251,262 @@ export default function Dashboard() {
     switch (activeTab) {
       case 'home':
         return (
-          <View style={styles.homeContainer}>
-            {/* Welcome Section */}
-            <View style={styles.welcomeSection}>
-              <Text style={styles.welcomeTitle}>
-                Welcome{user?.firstName ? `, ${user.firstName}` : ''}! 👋
-              </Text>
-              <Text style={styles.welcomeSubtitle}>Ready to explore new opportunities?</Text>
+          <ScrollView 
+            style={styles.homeContainer}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.homeScrollContent}
+          >
+            {/* Hero Section */}
+            <LinearGradient
+              colors={['#f97316', '#ef4444']}
+              style={styles.heroSection}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <View style={styles.heroContent}>
+                <View style={styles.greetingContainer}>
+                  <Text style={styles.greetingText}>Good Afternoon!</Text>
+                  <Text style={styles.userNameText}>
+                    {user?.firstName || user?.name?.split(' ')[0] || user?.first_name || 'Welcome!'}
+                  </Text>
+                  <Text style={styles.motivationText}>Ready to make today amazing? ✨</Text>
+                </View>
+                <TouchableOpacity style={styles.profileImageButton}>
+                  <LinearGradient
+                    colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.3)']}
+                    style={styles.profileImageContainer}
+                  >
+                    <Feather name="user" size={24} color="#ffffff" />
+                  </LinearGradient>
+                  <View style={styles.onlineIndicator} />
+                </TouchableOpacity>
+              </View>
+              
+              {/* Quick Stats Cards */}
+              <View style={styles.heroStatsContainer}>
+                <View style={styles.heroStatCard}>
+                  <Feather name="calendar" size={16} color="#ffffff" />
+                  <Text style={styles.heroStatNumber}>12</Text>
+                  <Text style={styles.heroStatLabel}>Events</Text>
+                </View>
+                <View style={styles.heroStatCard}>
+                  <Feather name="users" size={16} color="#ffffff" />
+                  <Text style={styles.heroStatNumber}>5</Text>
+                  <Text style={styles.heroStatLabel}>Clubs</Text>
+                </View>
+                <View style={styles.heroStatCard}>
+                  <Feather name="award" size={16} color="#ffffff" />
+                  <Text style={styles.heroStatNumber}>8</Text>
+                  <Text style={styles.heroStatLabel}>Certificates</Text>
+                </View>
+              </View>
+            </LinearGradient>
+
+            {/* Quick Actions */}
+            <View style={styles.quickActionsSection}>
+              <Text style={styles.sectionTitle}>Quick Actions</Text>
+              <View style={styles.quickActionsGrid}>
+                <TouchableOpacity 
+                  style={styles.quickActionCard}
+                  onPress={() => setActiveTab('events')}
+                >
+                  <LinearGradient
+                    colors={['#3b82f6', '#1d4ed8']}
+                    style={styles.quickActionIcon}
+                  >
+                    <Feather name="calendar" size={20} color="#ffffff" />
+                  </LinearGradient>
+                  <Text style={styles.quickActionTitle}>Browse Events</Text>
+                  <Text style={styles.quickActionSubtitle}>Discover new opportunities</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.quickActionCard}
+                  onPress={() => setActiveTab('clubs')}
+                >
+                  <LinearGradient
+                    colors={['#8b5cf6', '#7c3aed']}
+                    style={styles.quickActionIcon}
+                  >
+                    <Feather name="users" size={20} color="#ffffff" />
+                  </LinearGradient>
+                  <Text style={styles.quickActionTitle}>Find Clubs</Text>
+                  <Text style={styles.quickActionSubtitle}>Connect with communities</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.quickActionCard}
+                  onPress={() => setActiveTab('wallet')}
+                >
+                  <LinearGradient
+                    colors={['#10b981', '#059669']}
+                    style={styles.quickActionIcon}
+                  >
+                    <Feather name="award" size={20} color="#ffffff" />
+                  </LinearGradient>
+                  <Text style={styles.quickActionTitle}>Certificates</Text>
+                  <Text style={styles.quickActionSubtitle}>View achievements</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.quickActionCard}
+                  onPress={() => setActiveTab('profile')}
+                >
+                  <LinearGradient
+                    colors={['#f59e0b', '#d97706']}
+                    style={styles.quickActionIcon}
+                  >
+                    <Feather name="user" size={20} color="#ffffff" />
+                  </LinearGradient>
+                  <Text style={styles.quickActionTitle}>Edit Profile</Text>
+                  <Text style={styles.quickActionSubtitle}>Update information</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
-            {/* Quick Stats */}
-            <View style={styles.statsContainer}>
-              <View style={styles.statCard}>
-                <LinearGradient colors={['#10b981', '#059669']} style={styles.statIconContainer}>
-                  <Feather name="calendar" size={20} color="#ffffff" />
-                </LinearGradient>
-                <Text style={styles.statNumber}>12</Text>
-                <Text style={styles.statLabel}>Events Attended</Text>
+            {/* Upcoming Events */}
+            <View style={styles.upcomingEventsSection}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Upcoming Events</Text>
+                <TouchableOpacity onPress={() => setActiveTab('events')}>
+                  <Text style={styles.viewAllText}>View All</Text>
+                </TouchableOpacity>
               </View>
-              <View style={styles.statCard}>
-                <LinearGradient colors={['#3b82f6', '#1d4ed8']} style={styles.statIconContainer}>
-                  <Feather name="users" size={20} color="#ffffff" />
-                </LinearGradient>
-                <Text style={styles.statNumber}>5</Text>
-                <Text style={styles.statLabel}>Clubs Joined</Text>
-              </View>
-              <View style={styles.statCard}>
-                <LinearGradient colors={['#f59e0b', '#d97706']} style={styles.statIconContainer}>
-                  <Feather name="award" size={20} color="#ffffff" />
-                </LinearGradient>
-                <Text style={styles.statNumber}>8</Text>
-                <Text style={styles.statLabel}>Certificates</Text>
-              </View>
-            </View>
-
-            {/* Feed Header */}
-            <View style={styles.feedHeaderContainer}>
-              <Text style={styles.feedHeader}>Latest Updates</Text>
-              <TouchableOpacity style={styles.viewAllButton}>
-                <Text style={styles.viewAllText}>View All</Text>
-                <Feather name="arrow-right" size={16} color="#f97316" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Feed Items */}
-            <View style={styles.feedContainer}>
-              {feedData.map(item => (
-                <TouchableOpacity key={item.id} style={styles.feedCard}>
-                  {item.image && (
-                    <View style={styles.feedImageContainer}>
-                      <Image source={item.image} style={styles.feedImage} />
-                      <LinearGradient
-                        colors={['transparent', 'rgba(0,0,0,0.7)']}
-                        style={styles.feedImageOverlay}
-                      />
-                      <View style={styles.feedTypeBadge}>
-                        <Text style={styles.feedTypeBadgeText}>
-                          {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
-                        </Text>
-                      </View>
-                    </View>
-                  )}
-                  <View style={styles.feedContent}>
-                    <Text style={styles.feedTitle} numberOfLines={2}>{item.title}</Text>
-                    <Text style={styles.feedDescription} numberOfLines={3}>{item.description}</Text>
-                    
-                    <View style={styles.feedFooter}>
-                      <View style={styles.feedTimeContainer}>
-                        <Feather name="clock" size={14} color="#9ca3af" />
-                        <Text style={styles.feedTime}>{item.time}</Text>
-                      </View>
-                      {(item.type === 'event' || item.type === 'club') && (
-                        <TouchableOpacity
-                          style={[
-                            styles.actionButton,
-                            item.type === 'event' ? styles.eventButton : styles.clubButton,
-                          ]}
-                          onPress={() => {
-                            if (item.type === 'event') {
-                              router.push(`/event/apply?id=${item.id}`);
-                            }
-                          }}
-                        >
-                          <Text style={styles.actionButtonText}>
-                            {item.type === 'event' ? 'Apply Now' : 'Join Club'}
-                          </Text>
-                          <Feather name="arrow-right" size={14} color="#ffffff" />
-                        </TouchableOpacity>
-                      )}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+                <TouchableOpacity style={styles.upcomingEventCard}>
+                  <Image 
+                    source={{ uri: 'https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=200&h=120&fit=crop' }}
+                    style={styles.upcomingEventImage}
+                  />
+                  <View style={styles.upcomingEventOverlay} />
+                  <View style={styles.upcomingEventContent}>
+                    <Text style={styles.upcomingEventTitle}>Beach Cleanup</Text>
+                    <Text style={styles.upcomingEventDate}>July 25, 8:00 AM</Text>
+                    <View style={styles.upcomingEventStatus}>
+                      <Text style={styles.upcomingEventStatusText}>Applied</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
-              ))}
+
+                <TouchableOpacity style={styles.upcomingEventCard}>
+                  <Image 
+                    source={{ uri: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=200&h=120&fit=crop' }}
+                    style={styles.upcomingEventImage}
+                  />
+                  <View style={styles.upcomingEventOverlay} />
+                  <View style={styles.upcomingEventContent}>
+                    <Text style={styles.upcomingEventTitle}>Coding Workshop</Text>
+                    <Text style={styles.upcomingEventDate}>July 28, 2:00 PM</Text>
+                    <View style={styles.upcomingEventStatus}>
+                      <Text style={styles.upcomingEventStatusText}>Registered</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.upcomingEventCard}>
+                  <Image 
+                    source={{ uri: 'https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=200&h=120&fit=crop' }}
+                    style={styles.upcomingEventImage}
+                  />
+                  <View style={styles.upcomingEventOverlay} />
+                  <View style={styles.upcomingEventContent}>
+                    <Text style={styles.upcomingEventTitle}>Art Exhibition</Text>
+                    <Text style={styles.upcomingEventDate}>Aug 2, 10:00 AM</Text>
+                    <View style={styles.upcomingEventStatus}>
+                      <Text style={styles.upcomingEventStatusText}>Interested</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </ScrollView>
             </View>
-          </View>
+
+            {/* My Clubs Preview */}
+            <View style={styles.clubsPreviewSection}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>My Active Clubs</Text>
+                <TouchableOpacity onPress={() => setActiveTab('clubs')}>
+                  <Text style={styles.viewAllText}>View All</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <TouchableOpacity style={styles.clubPreviewCard}>
+                <Image 
+                  source={require('../assets/3.png')}
+                  style={styles.clubPreviewImage}
+                />
+                <View style={styles.clubPreviewInfo}>
+                  <Text style={styles.clubPreviewName}>Eco Warriors</Text>
+                  <Text style={styles.clubPreviewCategory}>Environment • 45 members</Text>
+                  <View style={styles.clubPreviewNext}>
+                    <Feather name="calendar" size={12} color="#f97316" />
+                    <Text style={styles.clubPreviewNextText}>Tree Planting - July 28</Text>
+                  </View>
+                </View>
+                <View style={styles.clubPreviewRole}>
+                  <Text style={styles.clubPreviewRoleText}>Member</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.clubPreviewCard}>
+                <Image 
+                  source={require('../assets/1.jpeg')}
+                  style={styles.clubPreviewImage}
+                />
+                <View style={styles.clubPreviewInfo}>
+                  <Text style={styles.clubPreviewName}>Music Society</Text>
+                  <Text style={styles.clubPreviewCategory}>Arts • 78 members</Text>
+                  <View style={styles.clubPreviewNext}>
+                    <Feather name="calendar" size={12} color="#f97316" />
+                    <Text style={styles.clubPreviewNextText}>Music Festival - Aug 5</Text>
+                  </View>
+                </View>
+                <View style={styles.clubPreviewRole}>
+                  <Text style={styles.clubPreviewRoleText}>Core Member</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Recent Activity */}
+            <View style={styles.activitySection}>
+              <Text style={styles.sectionTitle}>Recent Activity</Text>
+              
+              <View style={styles.activityCard}>
+                <View style={[styles.activityIcon, { backgroundColor: '#10b981' }]}>
+                  <Feather name="award" size={16} color="#ffffff" />
+                </View>
+                <View style={styles.activityContent}>
+                  <Text style={styles.activityTitle}>Earned Environmental Leadership Certificate</Text>
+                  <Text style={styles.activitySubtitle}>From Eco Warriors Club</Text>
+                  <Text style={styles.activityTime}>2 hours ago</Text>
+                </View>
+              </View>
+
+              <View style={styles.activityCard}>
+                <View style={[styles.activityIcon, { backgroundColor: '#3b82f6' }]}>
+                  <Feather name="calendar-check" size={16} color="#ffffff" />
+                </View>
+                <View style={styles.activityContent}>
+                  <Text style={styles.activityTitle}>Attended Community Service Workshop</Text>
+                  <Text style={styles.activitySubtitle}>Caring Hearts Club</Text>
+                  <Text style={styles.activityTime}>1 day ago</Text>
+                </View>
+              </View>
+
+              <View style={styles.activityCard}>
+                <View style={[styles.activityIcon, { backgroundColor: '#8b5cf6' }]}>
+                  <Feather name="users" size={16} color="#ffffff" />
+                </View>
+                <View style={styles.activityContent}>
+                  <Text style={styles.activityTitle}>Joined Photography Club</Text>
+                  <Text style={styles.activitySubtitle}>Now member of 5 clubs</Text>
+                  <Text style={styles.activityTime}>3 days ago</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Bottom Spacing */}
+            <View style={{ height: 20 }} />
+          </ScrollView>
         );
 
       case 'events':
@@ -364,11 +537,7 @@ export default function Dashboard() {
               </View>
               <View style={styles.clubStatCard}>
                 <Text style={styles.clubStatNumber}>{clubsData.filter(club => club.status === 'Active').length}</Text>
-                <Text style={styles.clubStatLabel}>Active Memberships</Text>
-              </View>
-              <View style={styles.clubStatCard}>
-                <Text style={styles.clubStatNumber}>{clubsData.filter(club => club.role.includes('President') || club.role.includes('Vice')).length}</Text>
-                <Text style={styles.clubStatLabel}>Leadership Roles</Text>
+                <Text style={styles.clubStatLabel}>Active{'\n'}Memberships</Text>
               </View>
             </View>
 
@@ -592,16 +761,7 @@ export default function Dashboard() {
 
         {/* Content Area */}
         <View style={styles.content}>
-          {activeTab === 'home' ? (
-            <ScrollView 
-              contentContainerStyle={styles.scrollContainer}
-              showsVerticalScrollIndicator={false}
-            >
-              {renderContent()}
-            </ScrollView>
-          ) : (
-            renderContent()
-          )}
+          {renderContent()}
         </View>
 
         {/* Floating Bottom Tab Bar */}
@@ -714,10 +874,6 @@ const styles = StyleSheet.create({
   // Content Styles
   content: { 
     flex: 1,
-    paddingBottom: 20, // Reduced padding for floating tab bar
-  },
-  scrollContainer: { 
-    paddingBottom: 120 // Extra space for floating tabs
   },
 
   // Floating Tab Bar Styles
@@ -789,6 +945,345 @@ const styles = StyleSheet.create({
   // Home Page Styles
   homeContainer: {
     flex: 1,
+    backgroundColor: '#fff7ed',
+  },
+  homeScrollContent: {
+    paddingBottom: 80,
+  },
+
+  // Hero Section
+  heroSection: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 32,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 24,
+    shadowColor: '#f97316',
+    shadowOffset: { width: 0, y: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  heroContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 24,
+  },
+  greetingContainer: {
+    flex: 1,
+  },
+  greetingText: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  userNameText: {
+    fontSize: 28,
+    color: '#ffffff',
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  motivationText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '500',
+  },
+  profileImageButton: {
+    position: 'relative',
+  },
+  profileImageContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  onlineIndicator: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#10b981',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+  },
+  heroStatsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  heroStatCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 16,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  heroStatNumber: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#ffffff',
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  heroStatLabel: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+
+  // Quick Actions
+  quickActionsSection: {
+    paddingHorizontal: 24,
+    marginTop: 32,
+  },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#000000',
+    marginBottom: 16,
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  quickActionCard: {
+    width: (width - 72) / 2,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+  },
+  quickActionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  quickActionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000000',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  quickActionSubtitle: {
+    fontSize: 12,
+    color: '#6b7280',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+
+  // Sections
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: '#f97316',
+    fontWeight: '600',
+  },
+
+  // Upcoming Events
+  upcomingEventsSection: {
+    paddingHorizontal: 24,
+    marginTop: 32,
+  },
+  horizontalScroll: {
+    marginLeft: -24,
+    paddingLeft: 24,
+  },
+  upcomingEventCard: {
+    width: 200,
+    marginRight: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  upcomingEventImage: {
+    width: '100%',
+    height: 120,
+  },
+  upcomingEventOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 120,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  upcomingEventContent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 12,
+  },
+  upcomingEventTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  upcomingEventDate: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 6,
+  },
+  upcomingEventStatus: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(249, 115, 22, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  upcomingEventStatusText: {
+    fontSize: 10,
+    color: '#ffffff',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+
+  // Clubs Preview
+  clubsPreviewSection: {
+    paddingHorizontal: 24,
+    marginTop: 32,
+  },
+  clubPreviewCard: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  clubPreviewImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 16,
+  },
+  clubPreviewInfo: {
+    flex: 1,
+  },
+  clubPreviewName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000000',
+    marginBottom: 4,
+  },
+  clubPreviewCategory: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginBottom: 6,
+  },
+  clubPreviewNext: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  clubPreviewNextText: {
+    fontSize: 11,
+    color: '#f97316',
+    fontWeight: '600',
+  },
+  clubPreviewRole: {
+    backgroundColor: '#fff7ed',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+  },
+  clubPreviewRoleText: {
+    fontSize: 10,
+    color: '#f97316',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+
+  // Activity Section
+  activitySection: {
+    paddingHorizontal: 24,
+    marginTop: 32,
+  },
+  activityCard: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    alignItems: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  activityIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  activityContent: {
+    flex: 1,
+  },
+  activityTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000000',
+    marginBottom: 4,
+  },
+  activitySubtitle: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  activityTime: {
+    fontSize: 11,
+    color: '#9ca3af',
   },
   welcomeSection: {
     paddingHorizontal: 24,
