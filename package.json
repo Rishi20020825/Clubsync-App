@@ -22,6 +22,7 @@
     "expo-linear-gradient": "~14.1.5",
     "expo-linking": "~7.1.5",
     "expo-router": "~5.1.1",
+    "expo-screen-capture": "~7.1.5",
     "expo-status-bar": "~2.2.3",
     "expo-web-browser": "~14.2.0",
     "lucide-react": "^0.525.0",
@@ -33,9 +34,8 @@
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
-    "react-native-web": "^0.20.0",
     "react-native-svg": "15.11.2",
-    "expo-screen-capture": "~7.1.5"
+    "react-native-web": "^0.20.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

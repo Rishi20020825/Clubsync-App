@@ -57,10 +57,7 @@ export default function ApplyEvent() {
   }, [id]);
 
   const handleApply = () => {
-    if (!applicantName || !applicantEmail) {
-      Alert.alert('Error', 'Please enter your name and email.');
-      return;
-    }
+  
     // Here you would send the application to your backend
     Alert.alert('Success', `Applied for ${event?.title}!`);
     router.replace('/dashboard');
