@@ -350,16 +350,16 @@ export default function Dashboard() {
 
                 <TouchableOpacity 
                   style={styles.quickActionCard}
-                  onPress={() => setActiveTab('profile')}
+                  onPress={() => router.push('/election')}
                 >
                   <LinearGradient
                     colors={['#f59e0b', '#d97706']}
                     style={styles.quickActionIcon}
                   >
-                    <Feather name="user" size={20} color="#ffffff" />
+                    <Feather name="vote" size={20} color="#ffffff" />
                   </LinearGradient>
-                  <Text style={styles.quickActionTitle}>Edit Profile</Text>
-                  <Text style={styles.quickActionSubtitle}>Update information</Text>
+                  <Text style={styles.quickActionTitle}>Elections</Text>
+                  <Text style={styles.quickActionSubtitle}>Cast your vote</Text>
                 </TouchableOpacity>
               </View>
             </View>
