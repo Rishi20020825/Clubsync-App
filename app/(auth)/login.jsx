@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,8 +7,10 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
-import {GOOGLE_CLIENT_ID , ANDROID_CLIENT_ID} from '@env';
+import { GOOGLE_CLIENT_ID, ANDROID_CLIENT_ID } from '@env';
 import { netconfig } from "../../netconfig";
+// Removed duplicate imports
+
 // Complete the auth session
 WebBrowser.maybeCompleteAuthSession();
 
@@ -21,7 +23,7 @@ export default function LoginScreen() {
 
 
 
-  // Google Auth Request - Using the same Client ID for all platforms
+  // Google Auth Request
   const [request, response, promptAsync] = Google.useAuthRequest({
     expoClientId: GOOGLE_CLIENT_ID,
     iosClientId: GOOGLE_CLIENT_ID,
@@ -32,8 +34,12 @@ export default function LoginScreen() {
   // Handle Google Sign-In Response
   useEffect(() => {
     if (response?.type === 'success') {
-      const { id_token } = response.authentication;
-      handleGoogleLogin(id_token);
+      const idToken = response.authentication?.idToken;
+      if (idToken) {
+        handleGoogleLogin(idToken);
+      } else {
+        Alert.alert("Google Sign-In Error", "No ID token received from Google.");
+      }
     }
   }, [response]);
 
@@ -60,14 +66,15 @@ export default function LoginScreen() {
     setLoading(false);
   };
 
+  // FIX: Send idToken, not googleToken, to backend
   const handleGoogleLogin = async (idToken) => {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${netconfig.API_BASE_URL}/api/mobile/signin`, {
+      const res = await fetch(`${netconfig.API_BASE_URL}/api/auth/mobile/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ googleToken: idToken }),
+        body: JSON.stringify({ idToken }), // <-- field name must match backend
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Google login failed');
@@ -76,6 +83,7 @@ export default function LoginScreen() {
       router.replace('/dashboard');
     } catch (err) {
       setError(err.message);
+      Alert.alert("Google Login Error", err.message);
     }
     setLoading(false);
   };
