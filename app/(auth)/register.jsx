@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -53,26 +53,49 @@ export default function RegisterScreen() {
   };
 
   return (
-    <LinearGradient colors={['#fff7ed', '#fff', '#fef2f2']} style={styles.gradient}>
-      <ScrollView contentContainerStyle={styles.container}>
-        {/* Branding */}
-        <View style={styles.brandRow}>
-          <View style={styles.brandIcon}>
-            <Feather name="zap" size={32} color="#fff" />
-          </View>
-          <Text style={styles.brandText}>ClubSync</Text>
-        </View>
-        <Text style={styles.heading}>Join the <Text style={styles.gradientText}>ClubSync</Text> Community</Text>
-        <Text style={styles.subheading}>Start your journey with us! Create your account to access exclusive club features, events, and volunteer opportunities.</Text>
+    <LinearGradient colors={['#fff7ed', '#fef2f2', '#fff']} style={styles.gradient}>
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingView} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.container}>
+            {/* Hero Section */}
+            <LinearGradient 
+              colors={['#fb923c', '#ef4444']} 
+              style={styles.heroSection}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <View style={styles.brandRow}>
+                <LinearGradient 
+                  colors={['#f97316', '#ef4444']} 
+                  style={styles.brandIcon}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <Feather name="zap" size={32} color="#ffffff" />
+                </LinearGradient>
+                <Text style={styles.brandText}>ClubSync</Text>
+              </View>
+              <Text style={styles.heading}>Join the ClubSync Community</Text>
+              <Text style={styles.subheading}>Start your journey with us! Create your account to access exclusive club features, events, and volunteer opportunities.</Text>
+            </LinearGradient>
         {/* Features */}
-        <View style={styles.features}>
-          <Feature icon="users" text="Connect with 100+ active clubs" />
-          <Feature icon="shield" text="Secure digital certificates" />
-          <Feature icon="smartphone" text="QR code check-ins" />
-        </View>
+        
+        
         {/* Form */}
         <View style={styles.form}>
-          {errors.general ? <Text style={styles.error}><Feather name="alert-circle" /> {errors.general}</Text> : null}
+          {errors.general ? (
+            <View style={styles.errorContainer}>
+              <Feather name="alert-circle" size={16} color="#ef4444" />
+              <Text style={styles.error}>{errors.general}</Text>
+            </View>
+          ) : null}
           <Input
             icon="user"
             placeholder="First Name"
@@ -128,16 +151,35 @@ export default function RegisterScreen() {
             </TouchableOpacity>
             <Text style={styles.checkboxLabel}>I agree to the terms and conditions</Text>
           </View>
-          {errors.agree ? <Text style={styles.error}><Feather name="alert-circle" /> {errors.agree}</Text> : null}
+          {errors.agree ? (
+            <View style={styles.errorContainer}>
+              <Feather name="alert-circle" size={16} color="#ef4444" />
+              <Text style={styles.error}>{errors.agree}</Text>
+            </View>
+          ) : null}
+          
           <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Create Account</Text>}
+            <LinearGradient 
+              colors={['#f97316', '#ef4444']} 
+              style={styles.buttonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              {loading ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <Text style={styles.buttonText}>Create Account</Text>
+              )}
+            </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
             <Text style={styles.linkCenter}>Already have an account? Sign in</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
-    </LinearGradient>
+      </View>
+    </ScrollView>
+  </KeyboardAvoidingView>
+</LinearGradient>
   );
 }
 
@@ -154,44 +196,231 @@ function Feature({ icon, text }) {
 
 function Input({ icon, rightIcon, onRightIconPress, error, ...props }) {
   return (
-    <>
-      <View style={styles.inputRow}>
-        <Feather name={icon} size={20} color="#aaa" style={styles.inputIcon} />
-        <TextInput style={styles.input} placeholderTextColor="#aaa" {...props} />
-        {rightIcon &&
+    <View style={styles.inputContainer}>
+      <View style={[styles.inputRow, error && styles.inputRowError]}>
+        <Feather name={icon} size={20} color="#6b7280" style={styles.inputIcon} />
+        <TextInput 
+          style={styles.input} 
+          placeholderTextColor="#9ca3af" 
+          {...props} 
+        />
+        {rightIcon && (
           <TouchableOpacity onPress={onRightIconPress} style={styles.inputRightIcon}>
-            <Feather name={rightIcon} size={20} color="#aaa" />
+            <Feather name={rightIcon} size={20} color="#6b7280" />
           </TouchableOpacity>
-        }
+        )}
       </View>
-      {error ? <Text style={styles.error}><Feather name="alert-circle" /> {error}</Text> : null}
-    </>
+      {error ? (
+        <View style={styles.errorContainer}>
+          <Feather name="alert-circle" size={16} color="#ef4444" />
+          <Text style={styles.error}>{error}</Text>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  gradient: { flex: 1 },
-  container: { flexGrow: 1, justifyContent: 'center', padding: 24 },
-  brandRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  brandIcon: { width: 48, height: 48, backgroundColor: '#fb923c', borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  brandText: { fontSize: 32, fontWeight: 'bold', color: '#222' },
-  heading: { fontSize: 28, fontWeight: 'bold', color: '#222', marginBottom: 8 },
-  gradientText: { color: '#fb923c' },
-  subheading: { color: '#666', fontSize: 16, marginBottom: 16 },
-  features: { marginBottom: 24 },
-  featureRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  featureIcon: { width: 32, height: 32, backgroundColor: '#ffedd5', borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
-  featureText: { color: '#444', fontSize: 15 },
-  form: { backgroundColor: '#fff', borderRadius: 24, padding: 20, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  error: { color: '#dc2626', marginBottom: 8, flexDirection: 'row', alignItems: 'center' },
-  inputRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f3f4f6', borderRadius: 12, marginBottom: 12, paddingHorizontal: 12 },
-  inputIcon: { marginRight: 8 },
-  input: { flex: 1, height: 48, fontSize: 16, color: '#222' },
-  inputRightIcon: { marginLeft: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  checkbox: { marginRight: 6 },
-  checkboxLabel: { color: '#444', fontSize: 15 },
-  button: { backgroundColor: '#fb923c', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 8 },
-  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  linkCenter: { color: '#fb923c', textAlign: 'center', marginTop: 8, fontWeight: 'bold' },
+  gradient: { 
+    flex: 1 
+  },
+  keyboardAvoidingView: { 
+    flex: 1 
+  },
+  scrollContainer: { 
+    flexGrow: 1, 
+    paddingTop: 40, 
+    paddingBottom: 40 
+  },
+  container: { 
+    alignItems: 'center', 
+    padding: 24, 
+    width: '100%',
+    maxWidth: 1280,
+    alignSelf: 'center'
+  },
+  heroSection: {
+    width: '100%',
+    borderRadius: 24,
+    padding: 32,
+    alignItems: 'center',
+    marginBottom: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  brandRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    marginBottom: 24 
+  },
+  brandIcon: { 
+    width: 48, 
+    height: 48, 
+    borderRadius: 16, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  brandText: { 
+    fontSize: 32, 
+    fontWeight: '700', 
+    color: '#ffffff' 
+  },
+  heading: { 
+    fontSize: 28, 
+    fontWeight: '700', 
+    color: '#ffffff', 
+    marginBottom: 12, 
+    textAlign: 'center' 
+  },
+  subheading: { 
+    color: '#ffffff', 
+    fontSize: 16, 
+    textAlign: 'center',
+    opacity: 0.9,
+    lineHeight: 24,
+  },
+  features: { 
+    marginBottom: 32,
+    width: '100%',
+  },
+  featureRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginBottom: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  featureIcon: { 
+    width: 40, 
+    height: 40, 
+    backgroundColor: '#fed7aa', 
+    borderRadius: 12, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    marginRight: 16 
+  },
+  featureText: { 
+    color: '#374151', 
+    fontSize: 16,
+    fontWeight: '500',
+    flex: 1,
+  },
+  form: { 
+    backgroundColor: '#ffffff', 
+    borderRadius: 24, 
+    padding: 32, 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1, 
+    shadowRadius: 20, 
+    elevation: 10, 
+    width: '100%', 
+    maxWidth: 400,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fee2e2',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  error: { 
+    color: '#ef4444', 
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  inputContainer: {
+    marginBottom: 16,
+  },
+  inputRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: '#f9fafb', 
+    borderRadius: 12, 
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    minHeight: 56,
+  },
+  inputRowError: {
+    borderColor: '#ef4444',
+    backgroundColor: '#fef2f2',
+  },
+  inputIcon: { 
+    marginRight: 12 
+  },
+  input: { 
+    flex: 1, 
+    fontSize: 16, 
+    color: '#000000',
+    fontWeight: '400',
+    paddingVertical: 16,
+  },
+  inputRightIcon: { 
+    marginLeft: 12,
+    padding: 4,
+  },
+  row: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginBottom: 24 
+  },
+  checkbox: { 
+    marginRight: 12 
+  },
+  checkboxLabel: { 
+    color: '#374151', 
+    fontSize: 15,
+    fontWeight: '400',
+    flex: 1,
+  },
+  button: { 
+    borderRadius: 12, 
+    marginBottom: 16,
+    shadowColor: '#f97316',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  buttonGradient: {
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 56,
+  },
+  buttonText: { 
+    color: '#ffffff', 
+    fontWeight: '600', 
+    fontSize: 16 
+  },
+  linkCenter: { 
+    color: '#f97316', 
+    textAlign: 'center', 
+    marginTop: 16, 
+    fontWeight: '600',
+    fontSize: 16,
+  },
 });
