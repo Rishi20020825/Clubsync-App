@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
-import {GOOGLE_CLIENT_ID} from '@env';
+import {GOOGLE_CLIENT_ID , ANDROID_CLIENT_ID} from '@env';
 import { netconfig } from "../../netconfig";
 // Complete the auth session
 WebBrowser.maybeCompleteAuthSession();
@@ -25,7 +25,7 @@ export default function LoginScreen() {
   const [request, response, promptAsync] = Google.useAuthRequest({
     expoClientId: GOOGLE_CLIENT_ID,
     iosClientId: GOOGLE_CLIENT_ID,
-    androidClientId: GOOGLE_CLIENT_ID,
+    androidClientId: ANDROID_CLIENT_ID,
     webClientId: GOOGLE_CLIENT_ID,
   });
 
