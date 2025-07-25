@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator , Alert , ScrollView , KeyboardAvoidingView,Platform,Image} from 'react-native';
+
 import { Feather } from '@expo/vector-icons';
 import { FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
