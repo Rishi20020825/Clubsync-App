@@ -435,33 +435,56 @@ export default function EventDetailsScreen() {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+      
 
       {/* Apply Button */}
       <View style={styles.buttonContainer}>
-        <TouchableOpacity 
-          style={[
-            styles.applyButton, 
-            (isFull || isApplied) && styles.disabledButton
-          ]} 
-          onPress={handleApply}
-          disabled={isFull || isApplied}
+  {isApplied ? (
+    <View style={styles.buttonGroup}>
+      <TouchableOpacity 
+        style={styles.qrButton}
+        onPress={() => router.push(`/event/qr/${event.id}`)}
+      >
+        <LinearGradient
+          colors={['#f97316', '#f97316']}
+          style={styles.qrButtonGradient}
         >
-          <LinearGradient
-            colors={(isFull || isApplied) ? ['#9ca3af', '#9ca3af'] : ['#f97316', '#ef4444']}
-            style={styles.applyButtonGradient}
-          >
-            <Feather 
-              name={isApplied ? 'check' : isFull ? 'x' : 'user-plus'} 
-              size={20} 
-              color="#ffffff" 
-            />
-            <Text style={styles.applyButtonText}>
-              {isApplied ? 'Applied Successfully' : isFull ? 'Event Full' : 'Apply Now'}
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
+          <Feather name="grid" size={20} color="#ffffff" />
+          <Text style={styles.qrButtonText}>Generate QR Code</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+      <TouchableOpacity 
+        style={[styles.applyButton, styles.disabledButton]} 
+        disabled={true}
+      >
+        <LinearGradient
+          colors={['#9ca3af', '#9ca3af']}
+          style={styles.applyButtonGradient}
+        >
+          <Feather name="check" size={20} color="#ffffff" />
+          <Text style={styles.applyButtonText}>Applied Successfully</Text>
+        </LinearGradient>
+      </TouchableOpacity>
     </View>
+  ) : (
+    <TouchableOpacity 
+      style={styles.applyButton}
+      onPress={handleApply}
+    >
+      <LinearGradient
+        colors={['#f97316', '#ef4444']}
+        style={styles.applyButtonGradient}
+      >
+        <Feather name="user-plus" size={20} color="#ffffff" />
+        <Text style={styles.applyButtonText}>Apply Now</Text>
+      </LinearGradient>
+    </TouchableOpacity>
+  )}
+</View>
+      
+
+    </View>
+    
   );
 }
 
@@ -763,5 +786,33 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#6b7280',
     marginBottom: 20,
+  },
+  buttonContainer: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  buttonGroup: {
+    gap: 12,
+  },
+  qrButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#9f5cf6ff',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  qrButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    gap: 8,
+  },
+  qrButtonText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
   },
 });

@@ -19,7 +19,9 @@ WebBrowser.maybeCompleteAuthSession();
 export default function LoginScreen() {
   const [form, setForm] = useState({ email: '', password: '', remember: false });
   const [showPassword, setShowPassword] = useState(false);
+
   const [loading, setLoading] = useState(false);
+  
   const [error, setError] = useState('');
   const router = useRouter();
 
@@ -61,7 +63,12 @@ export default function LoginScreen() {
       // Save token/user info as needed
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
-      router.replace('/dashboard');
+      
+     if (data.user.role === 'eventOrganizer') {
+        router.replace('/organizer/dashboard');
+      } else {  
+        router.replace('/dashboard');
+      }
     } catch (err) {
       setError(err.message);
     }

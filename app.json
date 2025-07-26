@@ -14,7 +14,10 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+    "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to access your camera for scanning QR codes."
+  }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,15 +25,24 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.clubsync.csapp"
+      "package": "com.clubsync.csapp",
+      "permissions": ["CAMERA"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router",
-      "expo-web-browser"
-    ],
+      
+  "expo-router",
+  "expo-web-browser",
+  [
+    "expo-barcode-scanner",
+    {
+      "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera for scanning QR codes."
+    }
+  ]
+]
+,
     "extra": {
       "router": {},
       "eas": {
