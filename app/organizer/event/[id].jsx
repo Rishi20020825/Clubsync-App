@@ -9,24 +9,24 @@ import {
   Modal,
   Animated,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { netconfig } from '../../../netconfig';
 
 export default function OrganizerEventScreen() {
   const { id: eventId } = useLocalSearchParams();
+  const router = useRouter();
+
   const [attended, setAttended] = useState([]);
   const [notAttended, setNotAttended] = useState([]);
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
 
   const [permission, requestPermission] = useCameraPermissions();
-  const slideAnim = useRef(new Animated.Value(1000)).current; // Start off-screen
+  const slideAnim = useRef(new Animated.Value(1000)).current;
 
   useEffect(() => {
-    if (!permission) {
-      requestPermission();
-    }
+    if (!permission) requestPermission();
   }, [permission]);
 
   useEffect(() => {
@@ -34,29 +34,17 @@ export default function OrganizerEventScreen() {
   }, [eventId]);
 
   useEffect(() => {
-    if (scanning) {
-      // Slide up animation when opening scanner
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      // Slide down when closing
-      Animated.timing(slideAnim, {
-        toValue: 1000,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    }
+    Animated.timing(slideAnim, {
+      toValue: scanning ? 0 : 1000,
+      duration: scanning ? 400 : 300,
+      useNativeDriver: true,
+    }).start();
   }, [scanning]);
 
   const fetchAttendance = async () => {
     try {
       setLoading(true);
-      const res = await fetch(
-        `${netconfig.API_BASE_URL}/api/events/${eventId}/attendance`
-      );
+      const res = await fetch(`${netconfig.API_BASE_URL}/api/events/${eventId}/attendance`);
       const data = await res.json();
       setAttended(data.attended || []);
       setNotAttended(data.notAttended || []);
@@ -76,14 +64,11 @@ export default function OrganizerEventScreen() {
         return;
       }
 
-      const res = await fetch(
-        `${netconfig.API_BASE_URL}/api/events/${eventId}/attendance`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId }),
-        }
-      );
+      const res = await fetch(`${netconfig.API_BASE_URL}/api/events/${eventId}/attendance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
 
       const result = await res.json();
       if (result.success) {
@@ -95,6 +80,17 @@ export default function OrganizerEventScreen() {
     } catch (err) {
       console.error('QR Scan error:', err);
       Alert.alert('Error', 'Invalid QR code format.');
+    }
+  };
+
+  const formatTime = (date) => {
+    try {
+      return new Date(date).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return '';
     }
   };
 
@@ -111,38 +107,43 @@ export default function OrganizerEventScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.heading}>Event Attendance</Text>
+
+      {/* Header with Back button and Title */}
+      <View style={styles.headerRow}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Text style={styles.backBtnText}>Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.heading}>Event Attendance</Text>
+      </View>
+
       <Text style={styles.subText}>Event ID: {eventId}</Text>
 
       {loading ? (
         <Text>Loading attendance...</Text>
       ) : (
         <>
-          {/* Tabs */}
           <View style={styles.tabs}>
+            {/* Arrived List */}
             <View style={styles.tab}>
               <Text style={styles.tabTitle}>Arrived ({attended.length})</Text>
               <FlatList
                 data={attended}
-                keyExtractor={(item) => item.userId.toString()}
+                keyExtractor={(item) => item.userId}
                 renderItem={({ item }) => (
                   <View style={styles.userCard}>
                     <Text>{item.userName}</Text>
-                    <Text style={styles.time}>
-                      {new Date(item.arrivedTime).toLocaleTimeString()}
-                    </Text>
+                    <Text style={styles.time}>{formatTime(item.arrivedTime)}</Text>
                   </View>
                 )}
               />
             </View>
 
+            {/* Not Arrived List */}
             <View style={styles.tab}>
-              <Text style={styles.tabTitle}>
-                Not Arrived ({notAttended.length})
-              </Text>
+              <Text style={styles.tabTitle}>Not Arrived ({notAttended.length})</Text>
               <FlatList
                 data={notAttended}
-                keyExtractor={(item) => item.userId.toString()}
+                keyExtractor={(item) => item.userId}
                 renderItem={({ item }) => (
                   <View style={styles.userCard}>
                     <Text>{item.userName}</Text>
@@ -152,43 +153,22 @@ export default function OrganizerEventScreen() {
             </View>
           </View>
 
-          {/* Scan QR Button */}
-          <TouchableOpacity
-            style={styles.scanBtn}
-            onPress={() => setScanning(true)}
-          >
+          <TouchableOpacity style={styles.scanBtn} onPress={() => setScanning(true)}>
             <Text style={styles.scanBtnText}>Scan QR to Mark Attendance</Text>
           </TouchableOpacity>
 
-          {/* Fullscreen Modal for Scanner */}
-          <Modal visible={scanning} animationType="fade" transparent={true}>
-            <Animated.View
-              style={[
-                styles.fullScreenWrapper,
-                { transform: [{ translateY: slideAnim }] },
-              ]}
-            >
-              {/* Full-screen Camera */}
+          {/* Scanner Modal */}
+          <Modal visible={scanning} animationType="fade" transparent>
+            <Animated.View style={[styles.fullScreenWrapper, { transform: [{ translateY: slideAnim }] }]}>
               <CameraView
                 style={styles.camera}
                 facing="back"
                 onBarcodeScanned={handleBarCodeScanned}
-                barcodeScannerSettings={{
-                  barcodeTypes: ['qr'],
-                }}
+                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
               />
-
-              {/* Dark overlay */}
               <View style={styles.overlay} />
-
-              {/* QR Guide Frame */}
               <View style={styles.guideFrame} />
-
-              {/* Cancel Button */}
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => setScanning(false)}
-              >
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setScanning(false)}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
             </Animated.View>
@@ -201,7 +181,28 @@ export default function OrganizerEventScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },
-  heading: { fontSize: 24, fontWeight: 'bold', marginBottom: 8 },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  backBtn: {
+    backgroundColor: '#f59e0b',
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 6,
+    marginRight: 12,
+    elevation: 3,
+  },
+  backBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  heading: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
   subText: { fontSize: 14, color: '#555', marginBottom: 16 },
   tabs: { flexDirection: 'row', flex: 1 },
   tab: { flex: 1, marginHorizontal: 4 },
@@ -213,7 +214,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   time: { color: '#10b981', fontSize: 13 },
-
   scanBtn: {
     position: 'absolute',
     bottom: 80,
@@ -230,18 +230,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   scanBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-
-  fullScreenWrapper: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  camera: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
+  fullScreenWrapper: { flex: 1, backgroundColor: '#000' },
+  camera: { ...StyleSheet.absoluteFillObject },
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
   guideFrame: {
     position: 'absolute',
     top: '35%',
@@ -261,10 +252,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 25,
     borderRadius: 8,
   },
-  cancelBtnText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 18,
-  },
+  cancelBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 18 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 });

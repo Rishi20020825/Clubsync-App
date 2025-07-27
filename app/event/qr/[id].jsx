@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import * as ScreenCapture from 'expo-screen-capture';
 
 export default function EventQRScreen() {
   const { id } = useLocalSearchParams();
@@ -12,23 +13,33 @@ export default function EventQRScreen() {
   const [user, setUser] = useState(null);
   const router = useRouter();
 
- useEffect(() => {
-  const loadData = async () => {
-    const userData = await AsyncStorage.getItem('user');
-    const user = JSON.parse(userData);
-    //console.log("RAW:" , userData);
-     // Log the raw user data
-    setUser(user);
-    const qrPayload = {
-      eventId: id,
-      userId: user.id,
-      timestamp: new Date().toISOString()
+  useEffect(() => {
+    // Prevent screenshots and screen recordings on this screen
+    ScreenCapture.preventScreenCaptureAsync();
+
+    // Allow screenshots again when leaving the screen
+    return () => {
+      ScreenCapture.allowScreenCaptureAsync();
     };
-    setQrData(JSON.stringify(qrPayload));
-    console.log('QR Data:', qrPayload); // This will log the QR data in your terminal
-  };
-  loadData();
-}, [id]);
+  }, []);
+
+  useEffect(() => {
+    const loadData = async () => {
+      const userData = await AsyncStorage.getItem('user');
+      const user = JSON.parse(userData);
+      //console.log("RAW:" , userData);
+      // Log the raw user data
+      setUser(user);
+      const qrPayload = {
+        eventId: id,
+        userId: user.id,
+        timestamp: new Date().toISOString()
+      };
+      setQrData(JSON.stringify(qrPayload));
+      console.log('QR Data:', qrPayload); // This will log the QR data in your terminal
+    };
+    loadData();
+  }, [id]);
 
   return (
     <View style={styles.container}>
@@ -77,7 +88,7 @@ const styles = StyleSheet.create({
     paddingTop: 48,
     paddingBottom: 20,
     paddingHorizontal: 20,
-    
+
     marginBottom: 8,
     elevation: 8,
     shadowColor: '#f97316',
@@ -119,6 +130,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
+
     fontWeight: 'bold',
     marginBottom: 8,
     color: '#1f2937',
@@ -142,3 +154,4 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 });
+
