@@ -296,7 +296,7 @@ const CastVotePage = () => {
                 )}
 
                 <View style={styles.infoBox}>
-                    <MaterialCommunityIcons name="shield-check" size={20} color="#f97316" />
+                    <MaterialCommunityIcons name="shield-checkmark" size={20} color="#f97316" />
                     <Text style={styles.infoText}>
                         Your vote is anonymous and secure. You cannot change your vote after submission.
                     </Text>

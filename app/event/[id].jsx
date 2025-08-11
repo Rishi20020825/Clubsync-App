@@ -1,7 +1,11 @@
 // app/event/[id].js - Event Details Screen
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Dimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
+
+const { width } = Dimensions.get('window');
 
 const MOCK_EVENTS = [
   {
@@ -19,6 +23,12 @@ const MOCK_EVENTS = [
     category: 'Environment',
     organizer: 'Green Earth Club',
     organizerContact: 'greenearth@example.com',
+    image: 'https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=800&h=400&fit=crop&crop=center',
+    galleryImages: [
+      'https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=400&h=300&fit=crop&crop=center',
+      'https://images.unsplash.com/photo-1581833971358-2c8b550f87b3?w=400&h=300&fit=crop&crop=center',
+      'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=400&h=300&fit=crop&crop=center'
+    ],
     requirements: [
       'Minimum age: 12 years old',
       'Wear closed-toe shoes',
@@ -53,6 +63,12 @@ const MOCK_EVENTS = [
     category: 'Community Service',
     organizer: 'Caring Hearts Club',
     organizerContact: 'caringhearts@example.com',
+    image: 'https://images.unsplash.com/photo-1593113616828-6f22bca04804?w=800&h=400&fit=crop&crop=center',
+    galleryImages: [
+      'https://images.unsplash.com/photo-1593113616828-6f22bca04804?w=400&h=300&fit=crop&crop=center',
+      'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=400&h=300&fit=crop&crop=center',
+      'https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=400&h=300&fit=crop&crop=center'
+    ],
     requirements: [
       'Minimum age: 16 years old',
       'Food handling knowledge preferred',
@@ -85,6 +101,12 @@ const MOCK_EVENTS = [
     category: 'Environment',
     organizer: 'Nature Lovers Society',
     organizerContact: 'naturelovers@example.com',
+    image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=800&h=400&fit=crop&crop=center',
+    galleryImages: [
+      'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=400&h=300&fit=crop&crop=center',
+      'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=300&fit=crop&crop=center',
+      'https://images.unsplash.com/photo-1574263867128-95bc526bd019?w=400&h=300&fit=crop&crop=center'
+    ],
     requirements: [
       'Minimum age: 14 years old',
       'Physical fitness required',
@@ -119,6 +141,12 @@ const MOCK_EVENTS = [
     category: 'Education',
     organizer: 'Book Buddies Club',
     organizerContact: 'bookbuddies@example.com',
+    image: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&h=400&fit=crop&crop=center',
+    galleryImages: [
+      'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=300&fit=crop&crop=center',
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop&crop=center',
+      'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=400&h=300&fit=crop&crop=center'
+    ],
     requirements: [
       'Minimum age: 18 years old',
       'Good command of English',
@@ -151,6 +179,12 @@ const MOCK_EVENTS = [
     category: 'Animal Welfare',
     organizer: 'Animal Lovers Unite',
     organizerContact: 'animallovers@example.com',
+    image: 'https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=800&h=400&fit=crop&crop=center',
+    galleryImages: [
+      'https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=400&h=300&fit=crop&crop=center',
+      'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=400&h=300&fit=crop&crop=center',
+      'https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=400&h=300&fit=crop&crop=center'
+    ],
     requirements: [
       'Minimum age: 16 years old',
       'Not afraid of animals',
@@ -243,45 +277,98 @@ export default function EventDetailsScreen() {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Hero Section */}
-        <View style={[styles.heroSection, { backgroundColor: getCategoryColor(event.category) }]}>
-          <View style={styles.categoryBadge}>
-            <Text style={styles.categoryText}>{event.category}</Text>
+        {/* Hero Image Section */}
+        <View style={styles.heroContainer}>
+          <Image 
+            source={{ uri: event.image }} 
+            style={styles.heroImage}
+            resizeMode="cover"
+          />
+          <View style={styles.heroOverlay} />
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Feather name="arrow-left" size={24} color="#ffffff" />
+          </TouchableOpacity>
+          <View style={styles.heroContent}>
+            <LinearGradient 
+              colors={isFull ? ['#ef4444', '#dc2626'] : ['#f97316', '#ef4444']}
+              style={styles.categoryBadge}
+            >
+              <Text style={styles.categoryText}>
+                {isFull ? 'FULL' : event.category}
+              </Text>
+            </LinearGradient>
+            <Text style={styles.eventTitle}>{event.title}</Text>
+            <Text style={styles.organizer}>Organized by {event.organizer}</Text>
           </View>
-          <Text style={styles.eventTitle}>{event.title}</Text>
-          <Text style={styles.organizer}>Organized by {event.organizer}</Text>
         </View>
 
-        {/* Quick Info */}
-        <View style={styles.quickInfo}>
-          <View style={styles.infoItem}>
-            <Text style={styles.infoIcon}>📅</Text>
-            <View>
+        {/* Quick Info Cards */}
+        <View style={styles.quickInfoContainer}>
+          <View style={styles.infoCard}>
+            <View style={styles.infoIconContainer}>
+              <Feather name="calendar" size={20} color="#f97316" />
+            </View>
+            <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Date & Time</Text>
               <Text style={styles.infoValue}>{event.date}</Text>
-              <Text style={styles.infoValue}>{event.time} ({event.duration})</Text>
+              <Text style={styles.infoSubValue}>{event.time} ({event.duration})</Text>
             </View>
           </View>
           
-          <View style={styles.infoItem}>
-            <Text style={styles.infoIcon}>📍</Text>
-            <View>
+          <View style={styles.infoCard}>
+            <View style={styles.infoIconContainer}>
+              <Feather name="map-pin" size={20} color="#f97316" />
+            </View>
+            <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Location</Text>
               <Text style={styles.infoValue}>{event.location}</Text>
               <Text style={styles.infoSubValue}>{event.meetingPoint}</Text>
             </View>
           </View>
           
-          <View style={styles.infoItem}>
-            <Text style={styles.infoIcon}>👥</Text>
-            <View>
+          <View style={styles.infoCard}>
+            <View style={styles.infoIconContainer}>
+              <Feather name="users" size={20} color="#f97316" />
+            </View>
+            <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Volunteers</Text>
               <Text style={styles.infoValue}>
                 {event.currentVolunteers}/{event.maxVolunteers} signed up
               </Text>
               {isFull && <Text style={styles.fullBadge}>FULL</Text>}
             </View>
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBackground}>
+                <LinearGradient
+                  colors={isFull ? ['#ef4444', '#dc2626'] : ['#f97316', '#ef4444']}
+                  style={[styles.progressFill, { width: `${Math.min((event.currentVolunteers / event.maxVolunteers) * 100, 100)}%` }]}
+                />
+              </View>
+            </View>
           </View>
+        </View>
+
+        {/* Gallery Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Event Gallery</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.galleryContainer}
+          >
+            {event.galleryImages.map((imageUri, index) => (
+              <View key={index} style={styles.galleryImageContainer}>
+                <Image 
+                  source={{ uri: imageUri }} 
+                  style={styles.galleryImage}
+                  resizeMode="cover"
+                />
+              </View>
+            ))}
+          </ScrollView>
         </View>
 
         {/* Description */}
@@ -293,64 +380,111 @@ export default function EventDetailsScreen() {
         {/* Requirements */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Requirements</Text>
-          {event.requirements.map((req, index) => (
-            <View key={index} style={styles.listItem}>
-              <Text style={styles.listBullet}>•</Text>
-              <Text style={styles.listText}>{req}</Text>
-            </View>
-          ))}
+          <View style={styles.listContainer}>
+            {event.requirements.map((req, index) => (
+              <View key={index} style={styles.listItem}>
+                <View style={styles.bulletContainer}>
+                  <Feather name="check-circle" size={16} color="#f97316" />
+                </View>
+                <Text style={styles.listText}>{req}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
         {/* What to Bring */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>What to Bring</Text>
-          {event.whatToBring.map((item, index) => (
-            <View key={index} style={styles.listItem}>
-              <Text style={styles.listBullet}>•</Text>
-              <Text style={styles.listText}>{item}</Text>
-            </View>
-          ))}
+          <View style={styles.listContainer}>
+            {event.whatToBring.map((item, index) => (
+              <View key={index} style={styles.listItem}>
+                <View style={styles.bulletContainer}>
+                  <Feather name="package" size={16} color="#f97316" />
+                </View>
+                <Text style={styles.listText}>{item}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
         {/* Benefits */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>What You'll Get</Text>
-          {event.benefits.map((benefit, index) => (
-            <View key={index} style={styles.listItem}>
-              <Text style={styles.listBullet}>✓</Text>
-              <Text style={styles.listText}>{benefit}</Text>
-            </View>
-          ))}
+          <View style={styles.listContainer}>
+            {event.benefits.map((benefit, index) => (
+              <View key={index} style={styles.listItem}>
+                <View style={styles.bulletContainer}>
+                  <Feather name="star" size={16} color="#f97316" />
+                </View>
+                <Text style={styles.listText}>{benefit}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
         {/* Contact */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contact</Text>
-          <Text style={styles.contactText}>{event.organizerContact}</Text>
+          <Text style={styles.sectionTitle}>Contact Information</Text>
+          <TouchableOpacity style={styles.contactContainer}>
+            <View style={styles.contactIconContainer}>
+              <Feather name="mail" size={20} color="#ffffff" />
+            </View>
+            <Text style={styles.contactText}>{event.organizerContact}</Text>
+          </TouchableOpacity>
         </View>
+
+        <View style={{ height: 100 }} />
       </ScrollView>
+      
 
       {/* Apply Button */}
       <View style={styles.buttonContainer}>
-        <TouchableOpacity 
-          style={[
-            styles.applyButton, 
-            (isFull || isApplied) && styles.disabledButton
-          ]} 
-          onPress={handleApply}
-          disabled={isFull || isApplied}
+  {isApplied ? (
+    <View style={styles.buttonGroup}>
+      <TouchableOpacity 
+        style={styles.qrButton}
+        onPress={() => router.push(`/event/qr/${event.id}`)}
+      >
+        <LinearGradient
+          colors={['#f97316', '#f97316']}
+          style={styles.qrButtonGradient}
         >
-          <Text style={styles.applyButtonText}>
-            {isApplied ? 'Applied ✓' : isFull ? 'Event Full' : 'Apply Now'}
-          </Text>
-        </TouchableOpacity>
-        
-        {/* For non-logged in users */}
-        {/* <TouchableOpacity style={styles.viewOnlyButton} onPress={handleViewOnly}>
-          <Text style={styles.viewOnlyButtonText}>Login to Apply</Text>
-        </TouchableOpacity> */}
-      </View>
+          <Feather name="grid" size={20} color="#ffffff" />
+          <Text style={styles.qrButtonText}>Generate QR Code</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+      <TouchableOpacity 
+        style={[styles.applyButton, styles.disabledButton]} 
+        disabled={true}
+      >
+        <LinearGradient
+          colors={['#9ca3af', '#9ca3af']}
+          style={styles.applyButtonGradient}
+        >
+          <Feather name="check" size={20} color="#ffffff" />
+          <Text style={styles.applyButtonText}>Applied Successfully</Text>
+        </LinearGradient>
+      </TouchableOpacity>
     </View>
+  ) : (
+    <TouchableOpacity 
+      style={styles.applyButton}
+      onPress={handleApply}
+    >
+      <LinearGradient
+        colors={['#f97316', '#ef4444']}
+        style={styles.applyButtonGradient}
+      >
+        <Feather name="user-plus" size={20} color="#ffffff" />
+        <Text style={styles.applyButtonText}>Apply Now</Text>
+      </LinearGradient>
+    </TouchableOpacity>
+  )}
+</View>
+      
+
+    </View>
+    
   );
 }
 
@@ -362,149 +496,286 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  heroSection: {
-    padding: 20,
-    paddingTop: 16,
+  
+  // Hero Image Section
+  heroContainer: {
+    position: 'relative',
+    height: 300,
+  },
+  heroImage: {
+    width: '100%',
+    height: '100%',
+  },
+  heroOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  backButton: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heroContent: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
   },
   categoryBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
     marginBottom: 12,
   },
   categoryText: {
-    color: '#fff',
+    color: '#ffffff',
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '700',
     textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   eventTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#ffffff',
     marginBottom: 8,
-    lineHeight: 34,
+    lineHeight: 38,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   organizer: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '500',
+    marginBottom: 20,
   },
-  quickInfo: {
+
+  // Quick Info Cards
+  quickInfoContainer: {
     padding: 20,
     backgroundColor: '#fff',
+    marginTop: -20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
     gap: 16,
   },
-  infoItem: {
+  infoCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
+    backgroundColor: '#f9fafb',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
-  infoIcon: {
-    fontSize: 18,
-    marginTop: 2,
+  infoIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  infoContent: {
+    flex: 1,
   },
   infoLabel: {
     fontSize: 12,
     color: '#6b7280',
     fontWeight: '600',
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
     marginBottom: 4,
   },
   infoValue: {
     fontSize: 16,
     color: '#111827',
-    fontWeight: '500',
+    fontWeight: '600',
+    marginBottom: 2,
   },
   infoSubValue: {
     fontSize: 14,
     color: '#6b7280',
-    marginTop: 2,
+    fontWeight: '400',
   },
   fullBadge: {
-    backgroundColor: '#fef2f2',
+    backgroundColor: '#fee2e2',
     color: '#dc2626',
     fontSize: 10,
-    fontWeight: 'bold',
+    fontWeight: '700',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 6,
     textTransform: 'uppercase',
     alignSelf: 'flex-start',
     marginTop: 4,
   },
+  progressContainer: {
+    marginTop: 8,
+    width: 60,
+  },
+  progressBackground: {
+    height: 4,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+
+  // Gallery Section
+  galleryContainer: {
+    marginTop: 12,
+  },
+  galleryImageContainer: {
+    marginRight: 12,
+  },
+  galleryImage: {
+    width: 120,
+    height: 80,
+    borderRadius: 8,
+  },
+
+  // Sections
   section: {
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#ffffff',
     marginTop: 8,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#111827',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   description: {
     fontSize: 16,
     color: '#374151',
-    lineHeight: 24,
+    lineHeight: 26,
+    fontWeight: '400',
+  },
+
+  // Lists
+  listContainer: {
+    gap: 12,
   },
   listItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 8,
-    gap: 8,
+    gap: 12,
   },
-  listBullet: {
-    fontSize: 16,
-    color: '#6366f1',
-    fontWeight: 'bold',
+  bulletContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginTop: 2,
   },
   listText: {
     fontSize: 16,
     color: '#374151',
     flex: 1,
-    lineHeight: 22,
+    lineHeight: 24,
+    fontWeight: '400',
+  },
+
+  // Contact
+  contactContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  contactIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f97316',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   contactText: {
     fontSize: 16,
-    color: '#6366f1',
-    fontWeight: '500',
+    color: '#f97316',
+    fontWeight: '600',
+    flex: 1,
   },
+
+  // Apply Button
   buttonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
   },
   applyButton: {
-    backgroundColor: '#6366f1',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#f97316',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   disabledButton: {
-    backgroundColor: '#9ca3af',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  applyButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    gap: 8,
   },
   applyButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
   },
-  viewOnlyButton: {
-    backgroundColor: '#e5e7eb',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  viewOnlyButtonText: {
-    color: '#6b7280',
-    fontSize: 16,
-    fontWeight: '500',
-  },
+  
+  // Error handling
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -516,14 +787,32 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginBottom: 20,
   },
-  backButton: {
-    backgroundColor: '#6366f1',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
+  buttonContainer: {
+    padding: 16,
+    paddingBottom: 32,
   },
-  backButtonText: {
-    color: '#fff',
-    fontWeight: '500',
+  buttonGroup: {
+    gap: 12,
+  },
+  qrButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#9f5cf6ff',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  qrButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    gap: 8,
+  },
+  qrButtonText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
   },
 });

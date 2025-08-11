@@ -62,7 +62,7 @@ export default function ElectionPage() {
             disabled={isLoading}
         >
             <MaterialCommunityIcons
-                name={isLoading ? "loading" : "vote"}
+                name={isLoading ? "loading" : "ballot"}
                 size={24}
                 color="#fff"
             />
@@ -154,7 +154,7 @@ export default function ElectionPage() {
                         <>
                             <View style={styles.heroSection}>
                                 <View style={styles.electionIcon}>
-                                    <MaterialCommunityIcons name="vote" size={36} color="#f97316" />
+                                    <MaterialCommunityIcons name="ballot" size={36} color="#f97316" />
                                 </View>
                                 <Text style={styles.title}>ClubSync Elections 2025</Text>
                                 <Text style={styles.subtitle}>Shape the future of our community</Text>
