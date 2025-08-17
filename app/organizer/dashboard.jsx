@@ -1,15 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState , useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { netconfig } from '../../netconfig'; // adjust the path if needed
+import { useFocusEffect } from '@react-navigation/native';
 export default function OrganizerDashboard() {
   const [events, setEvents] = useState([]);
   const router = useRouter();
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    // Update the fetchEvents function in your OrganizerDashboard component
-const fetchEvents = async () => {
+  const fetchEvents = async () => {
   try {
     const user = JSON.parse(await AsyncStorage.getItem('user'));
     const token = await AsyncStorage.getItem('token');
@@ -54,12 +54,21 @@ const fetchEvents = async () => {
     );
   }
 };
+  useEffect(() => {
+    
+
     fetchEvents();
-
-
-
   }, []);
-
+  useFocusEffect(
+    useCallback(() => {
+      fetchEvents();
+    }, [])
+  );
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchEvents();
+    setRefreshing(false);
+  };
   const handleSignOut = async () => {
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');
@@ -91,6 +100,8 @@ const fetchEvents = async () => {
             <Text style={styles.eventTitle}>{item.title}</Text>
           </TouchableOpacity>
         )}
+        refreshing={refreshing}   
+        onRefresh={onRefresh}
       />
     </View>
   );
