@@ -1,24 +1,62 @@
 // app/(tabs)/profile.js - ClubSync Profile Screen
 import React, { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import { netconfig } from '../../netconfig';
 
 export default function ProfileScreen() {
   const [user, setUser] = useState({ name: '', email: '' });
   const router = useRouter();
 
-  useEffect(() => {
-    const fetchUser = async () => {
+  const fetchUser = async () => {
+    try {
       const userData = await AsyncStorage.getItem('user');
+      const token = await AsyncStorage.getItem('token');
+      
       if (userData) {
-        setUser(JSON.parse(userData));
+        const localUser = JSON.parse(userData);
+        setUser(localUser);
+        
+        // If we have a token, try to fetch fresh data from server
+        if (token && localUser.id) {
+          try {
+            const response = await fetch(`${netconfig.API_BASE_URL}/api/users/${localUser.id}`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (response.ok) {
+              const freshUserData = await response.json();
+              // Update both state and local storage with fresh data
+              setUser(freshUserData);
+              await AsyncStorage.setItem('user', JSON.stringify(freshUserData));
+            }
+          } catch (error) {
+            console.log('Failed to fetch fresh user data:', error);
+            // Continue with local data if server request fails
+          }
+        }
       }
-    };
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  };
+
+  useEffect(() => {
     fetchUser();
   }, []);
+
+  // Refresh data when screen comes into focus (e.g., after editing profile)
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchUser();
+    }, [])
+  );
 
   const handleLogout = async () => {
     await AsyncStorage.removeItem('token');
@@ -163,6 +201,10 @@ export default function ProfileScreen() {
                   router.push('/profileupdate/update-profile');
                 } else if (item.id === 'help') {
                   router.push('/profile/help-support');
+                } else if (item.id === 'notifications') {
+                  router.push('/profile/notifications');
+                } else if (item.id === 'privacy') {
+                  router.push('/profile/privacy-security');
                 }
                 // Add other navigation logic here
               }}
@@ -207,7 +249,6 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
     </ScrollView>
-    </LinearGradient>
   );
 }
 
