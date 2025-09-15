@@ -11,12 +11,14 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+import { netconfig } from '../../netconfig';
 
 export default function UpdateProfile() {
   const [name, setName] = useState('');
@@ -25,6 +27,7 @@ export default function UpdateProfile() {
   const [image, setImage] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -49,18 +52,68 @@ export default function UpdateProfile() {
       return;
     }
 
-    const updatedUser = { 
-      name: `${firstName} ${lastName}`.trim(), 
-      firstName,
-      lastName,
-      email, 
-      phone, 
-      image 
-    };
-    await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
-    Alert.alert('Success', 'Profile updated successfully.', [
-      { text: 'OK', onPress: () => router.back() }
-    ]);
+    setLoading(true);
+    
+    try {
+      // Get the current user and token
+      const userData = await AsyncStorage.getItem('user');
+      const token = await AsyncStorage.getItem('token');
+      
+      if (!userData || !token) {
+        Alert.alert('Error', 'Please login again.');
+        setLoading(false);
+        return;
+      }
+
+      const currentUser = JSON.parse(userData);
+      
+      // Prepare update data
+      const updateData = {
+        firstName,
+        lastName,
+        email,
+        phone,
+        image
+      };
+
+      // Send update request to server
+      const response = await fetch(`${netconfig.API_BASE_URL}/api/users/${currentUser.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        // Update local storage with new data
+        const updatedUser = {
+          ...currentUser,
+          firstName,
+          lastName,
+          email,
+          phone,
+          image,
+          name: `${firstName} ${lastName}`.trim()
+        };
+        
+        await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+        
+        Alert.alert('Success', 'Profile updated successfully!', [
+          { text: 'OK', onPress: () => router.back() }
+        ]);
+      } else {
+        Alert.alert('Error', result.error || 'Failed to update profile.');
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      Alert.alert('Error', 'Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -194,15 +247,25 @@ export default function UpdateProfile() {
               </View>
 
               {/* Save Button */}
-              <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+              <TouchableOpacity 
+                style={[styles.saveButton, loading && styles.saveButtonDisabled]} 
+                onPress={handleSave}
+                disabled={loading}
+              >
                 <LinearGradient
-                  colors={['#f97316', '#ef4444']}
+                  colors={loading ? ['#9ca3af', '#6b7280'] : ['#f97316', '#ef4444']}
                   style={styles.saveButtonGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                 >
-                  <Feather name="save" size={18} color="#ffffff" />
-                  <Text style={styles.saveButtonText}>Save Changes</Text>
+                  {loading ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Feather name="save" size={18} color="#ffffff" />
+                  )}
+                  <Text style={styles.saveButtonText}>
+                    {loading ? 'Updating...' : 'Save Changes'}
+                  </Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -408,6 +471,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  saveButtonDisabled: {
+    shadowOpacity: 0.1,
+    elevation: 2,
   },
   saveButtonGradient: {
     flexDirection: 'row',
