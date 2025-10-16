@@ -1,77 +1,10 @@
 // app/(tabs)/events.js - Events List Screen
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-
-const MOCK_EVENTS = [
-  {
-    id: 1,
-    title: 'Beach Cleanup Drive',
-    description: 'Join us for a community beach cleanup to help protect marine life and keep our beaches beautiful.',
-    date: '2025-07-15',
-    time: '08:00 AM',
-    location: 'Mount Lavinia Beach',
-    maxVolunteers: 50,
-    currentVolunteers: 23,
-    category: 'Environment',
-    organizer: 'Green Earth Club',
-    image: 'https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=400&h=200&fit=crop&crop=center'
-  },
-  {
-    id: 2,
-    title: 'Food Distribution for Elderly',
-    description: 'Help distribute meals to elderly residents in the community. Make a difference in their day!',
-    date: '2025-07-08',
-    time: '11:00 AM',
-    location: 'Sarana Elder Home',
-    maxVolunteers: 20,
-    currentVolunteers: 8,
-    category: 'Community Service',
-    organizer: 'Caring Hearts Club',
-    image: 'https://images.unsplash.com/photo-1593113616828-6f22bca04804?w=400&h=200&fit=crop&crop=center'
-  },
-  {
-    id: 3,
-    title: 'Tree Planting Initiative',
-    description: 'Plant trees in the neighborhood park to create a greener environment for future generations.',
-    date: '2025-07-22',
-    time: '07:30 AM',
-    location: 'Gothatuwa Wetland Park',
-    maxVolunteers: 35,
-    currentVolunteers: 35,
-    category: 'Environment',
-    organizer: 'Nature Lovers Society',
-    image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=400&h=200&fit=crop&crop=center'
-  },
-  {
-    id: 4,
-    title: 'Reading Program for Kids',
-    description: 'Volunteer to read stories and help children improve their reading skills at the local library.',
-    date: '2025-07-12',
-    time: '02:00 PM',
-    location: 'Tampines Regional Library',
-    maxVolunteers: 15,
-    currentVolunteers: 12,
-    category: 'Education',
-    organizer: 'Book Buddies Club',
-    image: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=200&fit=crop&crop=center'
-  },
-  {
-    id: 5,
-    title: 'Animal Shelter Care',
-    description: 'Spend time caring for rescued animals, help with feeding, cleaning, and giving them love.',
-    date: '2025-07-18',
-    time: '09:00 AM',
-    location: 'SPCA Singapore',
-    maxVolunteers: 25,
-    currentVolunteers: 19,
-    category: 'Animal Welfare',
-    organizer: 'Animal Lovers Unite',
-    image: 'https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=400&h=200&fit=crop&crop=center'
-  }
-];
+import { netconfig } from '../../netconfig';
 
 const getCategoryColor = (category) => {
   const colors = {
@@ -176,10 +109,53 @@ export default function EventsScreen() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch events from database
+  const fetchEvents = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch(`${netconfig.API_BASE_URL}/api/events`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch events: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setEvents(data.events || data || []); // Handle different response structures
+    } catch (err) {
+      console.error('Error fetching events:', err);
+      setError(err.message || 'Failed to load events');
+      Alert.alert(
+        'Error',
+        'Failed to load events. Please check your internet connection and try again.',
+        [
+          { text: 'Retry', onPress: fetchEvents },
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch events on component mount
+  useEffect(() => {
+    fetchEvents();
+  }, []);
 
   const categories = ['All', 'Environment', 'Community Service', 'Education', 'Animal Welfare', 'Health'];
 
-  const filteredEvents = MOCK_EVENTS.filter(event => {
+  const filteredEvents = events.filter(event => {
     const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          event.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || event.category === selectedCategory;
@@ -209,77 +185,113 @@ export default function EventsScreen() {
           <Text style={styles.headerSubtitle}>
             Find volunteering opportunities and make a difference in your community
           </Text>
+          {/* Refresh button */}
+          <TouchableOpacity 
+            style={styles.refreshButton} 
+            onPress={fetchEvents}
+            disabled={loading}
+          >
+            <Feather 
+              name="refresh-cw" 
+              size={20} 
+              color="#ffffff" 
+              style={loading ? { opacity: 0.6 } : {}} 
+            />
+          </TouchableOpacity>
         </View>
       </LinearGradient>
 
-      {/* Search and Filter Section */}
-      <View style={styles.searchSection}>
-        <View style={styles.searchContainer}>
-          <Feather name="search" size={20} color="#6b7280" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search events..."
-            placeholderTextColor="#9ca3af"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
+      {/* Loading State */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#f97316" />
+          <Text style={styles.loadingText}>Loading events...</Text>
         </View>
-        
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesContainer}
-        >
-          {categories.map(category => (
-            <TouchableOpacity
-              key={category}
-              style={[
-                styles.categoryChip,
-                selectedCategory === category && styles.categoryChipActive
-              ]}
-              onPress={() => setSelectedCategory(category)}
-            >
-              <Text style={[
-                styles.categoryChipText,
-                selectedCategory === category && styles.categoryChipTextActive
-              ]}>
-                {category}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-      
-      {/* Events List */}
-      <View style={styles.eventsList}>
-        <View style={styles.eventsHeader}>
-          <Text style={styles.eventsCount}>
-            {filteredEvents.length} {filteredEvents.length === 1 ? 'Event' : 'Events'} Found
-          </Text>
-          <TouchableOpacity style={styles.sortButton}>
-            <Feather name="filter" size={16} color="#6b7280" />
-            <Text style={styles.sortButtonText}>Sort</Text>
+      ) : error ? (
+        /* Error State */
+        <View style={styles.errorContainer}>
+          <Feather name="alert-circle" size={64} color="#ef4444" />
+          <Text style={styles.errorTitle}>Unable to load events</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchEvents}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
         </View>
-        
-        {filteredEvents.map((event) => (
-          <EventCard
-            key={event.id}
-            event={event}
-            onPress={() => handleEventPress(event.id)}
-          />
-        ))}
-        
-        {filteredEvents.length === 0 && (
-          <View style={styles.emptyState}>
-            <Feather name="calendar" size={64} color="#fed7aa" />
-            <Text style={styles.emptyStateTitle}>No Events Found</Text>
-            <Text style={styles.emptyStateText}>
-              Try adjusting your search or filter criteria
-            </Text>
+      ) : (
+        <>
+          {/* Search and Filter Section */}
+          <View style={styles.searchSection}>
+            <View style={styles.searchContainer}>
+              <Feather name="search" size={20} color="#6b7280" />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search events..."
+                placeholderTextColor="#9ca3af"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+            
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoriesContainer}
+            >
+              {categories.map(category => (
+                <TouchableOpacity
+                  key={category}
+                  style={[
+                    styles.categoryChip,
+                    selectedCategory === category && styles.categoryChipActive
+                  ]}
+                  onPress={() => setSelectedCategory(category)}
+                >
+                  <Text style={[
+                    styles.categoryChipText,
+                    selectedCategory === category && styles.categoryChipTextActive
+                  ]}>
+                    {category}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
-        )}
-      </View>
+          
+          {/* Events List */}
+          <View style={styles.eventsList}>
+            <View style={styles.eventsHeader}>
+              <Text style={styles.eventsCount}>
+                {filteredEvents.length} {filteredEvents.length === 1 ? 'Event' : 'Events'} Found
+              </Text>
+              <TouchableOpacity style={styles.sortButton}>
+                <Feather name="filter" size={16} color="#6b7280" />
+                <Text style={styles.sortButtonText}>Sort</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {filteredEvents.map((event) => (
+              <EventCard
+                key={event.id}
+                event={event}
+                onPress={() => handleEventPress(event.id)}
+              />
+            ))}
+            
+            {filteredEvents.length === 0 && !loading && (
+              <View style={styles.emptyState}>
+                <Feather name="calendar" size={64} color="#fed7aa" />
+                <Text style={styles.emptyStateTitle}>No Events Found</Text>
+                <Text style={styles.emptyStateText}>
+                  {events.length === 0 
+                    ? "No events available at the moment. Check back later!" 
+                    : "Try adjusting your search or filter criteria"
+                  }
+                </Text>
+              </View>
+            )}
+          </View>
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -307,6 +319,15 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     alignItems: 'center',
+    position: 'relative',
+  },
+  refreshButton: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   headerTitle: {
     fontSize: 24,
@@ -323,6 +344,58 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
     paddingHorizontal: 20,
+  },
+
+  // Loading and Error States
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 80,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginTop: 16,
+    fontWeight: '500',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 80,
+    paddingHorizontal: 32,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#374151',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: '#f97316',
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    shadowColor: '#f97316',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 
   // Search and Filter Styles
