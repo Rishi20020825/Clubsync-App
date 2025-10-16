@@ -1,6 +1,6 @@
 // app/(tabs)/events.js - Events List Screen
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, ActivityIndicator, Alert, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, ActivityIndicator, Alert, RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -273,6 +273,19 @@ export default function EventsScreen() {
           <Text style={styles.headerSubtitle}>
             Find volunteering opportunities and make a difference in your community
           </Text>
+          {/* Refresh button */}
+          <TouchableOpacity 
+            style={styles.refreshButton} 
+            onPress={fetchEvents}
+            disabled={loading}
+          >
+            <Feather 
+              name="refresh-cw" 
+              size={20} 
+              color="#ffffff" 
+              style={loading ? { opacity: 0.6 } : {}} 
+            />
+          </TouchableOpacity>
         </View>
       </LinearGradient>
 
@@ -407,6 +420,15 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     alignItems: 'center',
+    position: 'relative',
+  },
+  refreshButton: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   headerTitle: {
     fontSize: 24,
@@ -423,6 +445,58 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
     paddingHorizontal: 20,
+  },
+
+  // Loading and Error States
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 80,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginTop: 16,
+    fontWeight: '500',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 80,
+    paddingHorizontal: 32,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#374151',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: '#f97316',
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    shadowColor: '#f97316',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 
   // Search and Filter Styles
