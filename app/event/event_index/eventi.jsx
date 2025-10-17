@@ -128,7 +128,7 @@ const EventCard = ({ event, onPress }) => {
 
 export default function EventsScreen() {
   const router = useRouter();
-
+z
   const handleEventPress = (eventId) => {
     router.push(`/event/${eventId}`);
   };

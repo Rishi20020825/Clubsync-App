@@ -8,6 +8,7 @@ import ProfileScreen from './(tabs)/profile';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { netconfig } from '../netconfig';
+import { netconfig } from '../netconfig';
 
 const { width } = Dimensions.get('window');
 
@@ -44,6 +45,7 @@ export default function Dashboard() {
       }
     };
     fetchUser();
+    fetchClubs(); // Fetch clubs when component mounts
   }, []);
 
   // Fetch user's clubs when clubs tab is active
@@ -168,74 +170,41 @@ export default function Dashboard() {
     },
   ];
 
-  // Clubs data
-  const clubsData = [
-    {
-      id: 1,
-      name: 'Eco Warriors',
-      category: 'Environment',
-      members: 45,
-      description: 'Promoting sustainability and environmental awareness on campus.',
-      role: 'Member',
-      joined: '2024-09-15',
-      status: 'Active',
-      image: require('../assets/3.png'),
-      nextEvent: 'Tree Planting Drive - July 28',
-      achievements: ['Green Campus Award 2024', 'Best Environmental Initiative'],
-    },
-    {
-      id: 2,
-      name: 'Music Society',
-      category: 'Arts',
-      members: 78,
-      description: 'Celebrating music and organizing cultural events throughout the year.',
-      role: 'Core Member',
-      joined: '2024-08-20',
-      status: 'Active',
-      image: require('../assets/1.jpeg'),
-      nextEvent: 'Music Festival - August 5',
-      achievements: ['Best Cultural Club 2024', 'Outstanding Performance Award'],
-    },
-    {
-      id: 3,
-      name: 'Debate Club',
-      category: 'Academic',
-      members: 32,
-      description: 'Enhancing public speaking and critical thinking skills.',
-      role: 'Vice President',
-      joined: '2024-07-10',
-      status: 'Active',
-      image: require('../assets/vote.jpg'),
-      nextEvent: 'Inter-College Debate - August 12',
-      achievements: ['National Debate Championship 2024', 'Best Orator Award'],
-    },
-    {
-      id: 4,
-      name: 'AI & Robotics Club',
-      category: 'Technology',
-      members: 56,
-      description: 'Exploring artificial intelligence and robotics innovations.',
-      role: 'Member',
-      joined: '2024-06-25',
-      status: 'Active',
-      image: require('../assets/2.png'),
-      nextEvent: 'AI Workshop - July 30',
-      achievements: ['Tech Innovation Award 2024', 'Best Project Showcase'],
-    },
-    {
-      id: 5,
-      name: 'Photography Club',
-      category: 'Arts',
-      members: 29,
-      description: 'Capturing moments and improving photography skills together.',
-      role: 'Member',
-      joined: '2024-05-18',
-      status: 'Inactive',
-      image: require('../assets/3.png'),
-      nextEvent: 'Photo Walk - August 3',
-      achievements: ['Best Photography Exhibition 2024'],
-    },
-  ];
+  // Function to fetch clubs from database
+  const fetchClubs = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const userData = await AsyncStorage.getItem('user');
+      const token = await AsyncStorage.getItem('token');
+      
+      if (!userData || !token) {
+        throw new Error('User not authenticated');
+      }
+      
+      const user = JSON.parse(userData);
+      const userId = user.id || user.userId || user.user_id;
+      
+      const res = await fetch(`${netconfig.API_BASE_URL}/api/clubs?userId=${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!res.ok) throw new Error('Failed to fetch clubs');
+      const data = await res.json();
+      
+      console.log('Clubs API Response:', data);
+      setClubsData(data.clubs || data || []);
+    } catch (err) {
+      console.error('Error fetching clubs:', err);
+      setError(err.message);
+      // Set empty array as fallback
+      setClubsData([]);
+    }
+    setLoading(false);
+  };
 
   // Wallet/Certificates data
   const certificatesData = [
@@ -511,41 +480,49 @@ export default function Dashboard() {
                 </TouchableOpacity>
               </View>
               
-              <TouchableOpacity style={styles.clubPreviewCard}>
-                <Image 
-                  source={require('../assets/3.png')}
-                  style={styles.clubPreviewImage}
-                />
-                <View style={styles.clubPreviewInfo}>
-                  <Text style={styles.clubPreviewName}>Eco Warriors</Text>
-                  <Text style={styles.clubPreviewCategory}>Environment • 45 members</Text>
-                  <View style={styles.clubPreviewNext}>
-                    <Feather name="calendar" size={12} color="#f97316" />
-                    <Text style={styles.clubPreviewNextText}>Tree Planting - July 28</Text>
-                  </View>
+              {loading ? (
+                <View style={{ alignItems: 'center', marginVertical: 20 }}>
+                  <Text style={{ color: '#6b7280' }}>Loading clubs...</Text>
                 </View>
-                <View style={styles.clubPreviewRole}>
-                  <Text style={styles.clubPreviewRoleText}>Member</Text>
+              ) : error ? (
+                <View style={{ alignItems: 'center', marginVertical: 20 }}>
+                  <Text style={{ color: 'red', fontSize: 14 }}>Failed to load clubs</Text>
+                  <TouchableOpacity onPress={fetchClubs} style={{ marginTop: 8 }}>
+                    <Text style={{ color: '#f97316', fontSize: 12 }}>Retry</Text>
+                  </TouchableOpacity>
                 </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.clubPreviewCard}>
-                <Image 
-                  source={require('../assets/1.jpeg')}
-                  style={styles.clubPreviewImage}
-                />
-                <View style={styles.clubPreviewInfo}>
-                  <Text style={styles.clubPreviewName}>Music Society</Text>
-                  <Text style={styles.clubPreviewCategory}>Arts • 78 members</Text>
-                  <View style={styles.clubPreviewNext}>
-                    <Feather name="calendar" size={12} color="#f97316" />
-                    <Text style={styles.clubPreviewNextText}>Music Festival - Aug 5</Text>
-                  </View>
+              ) : clubsData && clubsData.length > 0 ? (
+                clubsData.slice(0, 2).map((club) => (
+                  <TouchableOpacity key={club.id} style={styles.clubPreviewCard}>
+                    <Image 
+                      source={club.image ? { uri: club.image } : require('../assets/3.png')}
+                      style={styles.clubPreviewImage}
+                    />
+                    <View style={styles.clubPreviewInfo}>
+                      <Text style={styles.clubPreviewName}>{club.name || 'Club Name'}</Text>
+                      <Text style={styles.clubPreviewCategory}>
+                        {club.category || 'Category'} • {club.members || 0} members
+                      </Text>
+                      {club.nextEvent && (
+                        <View style={styles.clubPreviewNext}>
+                          <Feather name="calendar" size={12} color="#f97316" />
+                          <Text style={styles.clubPreviewNextText}>{club.nextEvent}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.clubPreviewRole}>
+                      <Text style={styles.clubPreviewRoleText}>{club.role || 'Member'}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={{ alignItems: 'center', marginVertical: 20 }}>
+                  <Text style={{ color: '#6b7280', fontSize: 14 }}>No active clubs found</Text>
+                  <TouchableOpacity onPress={() => setActiveTab('clubs')} style={{ marginTop: 8 }}>
+                    <Text style={{ color: '#f97316', fontSize: 12 }}>Join clubs</Text>
+                  </TouchableOpacity>
                 </View>
-                <View style={styles.clubPreviewRole}>
-                  <Text style={styles.clubPreviewRoleText}>Core Member</Text>
-                </View>
-              </TouchableOpacity>
+              )}
             </View>
 
             {/* Recent Activity */}
@@ -693,12 +670,12 @@ export default function Dashboard() {
                     </View>
                   </View>
 
-                  {club.nextEvent && (
-                    <View style={styles.nextEventContainer}>
-                      <Feather name="clock" size={14} color="#f97316" />
-                      <Text style={styles.nextEventText}>Next: {club.nextEvent}</Text>
-                    </View>
-                  )}
+                    {club.nextEvent && (
+                      <View style={styles.nextEventContainer}>
+                        <Feather name="clock" size={14} color="#f97316" />
+                        <Text style={styles.nextEventText}>Next: {club.nextEvent}</Text>
+                      </View>
+                    )}
 
                   <View style={styles.clubFooter}>
                     <View style={styles.achievementsContainer}>
