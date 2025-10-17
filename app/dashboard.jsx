@@ -7,6 +7,7 @@ import EventsScreen from './(tabs)/events';
 import ProfileScreen from './(tabs)/profile';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { netconfig } from '../netconfig';
 
 const { width } = Dimensions.get('window');
 
@@ -21,6 +22,9 @@ const TABS = [
 export default function Dashboard() {
   const [user, setUser] = useState({});
   const [activeTab, setActiveTab] = useState('home');
+  const [userClubs, setUserClubs] = useState([]);
+  const [loadingClubs, setLoadingClubs] = useState(false);
+  const [clubsError, setClubsError] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -41,6 +45,84 @@ export default function Dashboard() {
     };
     fetchUser();
   }, []);
+
+  // Fetch user's clubs when clubs tab is active
+  useEffect(() => {
+    if (activeTab === 'clubs' && user?.id) {
+      fetchUserClubs();
+    }
+  }, [activeTab, user?.id]);
+
+  const fetchUserClubs = async () => {
+    setLoadingClubs(true);
+    setClubsError(null);
+    
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const userData = await AsyncStorage.getItem('user');
+
+      console.log('🔑 Token:', token ? 'exists' : 'missing');
+      console.log('👤 User Data:', userData);
+      
+      if (!token || !userData) {
+        setClubsError('Please login to view your clubs');
+        setLoadingClubs(false);
+        return;
+      }
+
+      const userObj = JSON.parse(userData);
+      console.log('📝 Parsed User:', userObj);
+
+      // Use query parameter to filter clubs by userId
+      const apiUrl = `${netconfig.API_BASE_URL}/api/clubs/mobile?userId=${userObj.id}`;
+      console.log('🌐 API URL:', apiUrl);
+
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('📊 Response Status:', response.status);
+      console.log('📊 Response OK:', response.ok);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API Error:', errorText);
+        throw new Error(`Failed to fetch clubs: ${response.status}`);
+      }
+
+      const clubs = await response.json();
+      console.log('✅ Fetched Clubs:', clubs);
+      
+      // Map the API response to match the existing UI structure
+      const mappedClubs = clubs.map(club => ({
+        id: club.id,
+        name: club.name,
+        category: 'Community',
+        members: club._count?.members || 0,
+        description: club.about || club.mission || 'No description available',
+        role: club.members?.[0]?.role || 'member',
+        joined: club.members?.[0]?.joinedAt || club.createdAt,
+        status: club.isActive ? 'Active' : 'Inactive',
+        image: club.profileImage ? { uri: club.profileImage } : require('../assets/3.png'),
+        nextEvent: null,
+        achievements: [],
+      }));
+
+      console.log('📋 Mapped Clubs:', mappedClubs);
+      setUserClubs(mappedClubs);
+      
+    } catch (error) {
+      console.error('❌ Error fetching user clubs:', error);
+      console.error('❌ Error details:', error.message);
+      setClubsError('Failed to load your clubs. Please try again.');
+    } finally {
+      setLoadingClubs(false);
+    }
+  };
 
   // Feed data for home page
   const feedData = [
@@ -532,11 +614,11 @@ export default function Dashboard() {
             {/* Clubs Stats */}
             <View style={styles.clubsStatsContainer}>
               <View style={styles.clubStatCard}>
-                <Text style={styles.clubStatNumber}>{clubsData.length}</Text>
+                <Text style={styles.clubStatNumber}>{userClubs.length}</Text>
                 <Text style={styles.clubStatLabel}>Clubs Joined</Text>
               </View>
               <View style={styles.clubStatCard}>
-                <Text style={styles.clubStatNumber}>{clubsData.filter(club => club.status === 'Active').length}</Text>
+                <Text style={styles.clubStatNumber}>{userClubs.filter(club => club.status === 'Active').length}</Text>
                 <Text style={styles.clubStatLabel}>Active{'\n'}Memberships</Text>
               </View>
             </View>
@@ -551,7 +633,29 @@ export default function Dashboard() {
                 </TouchableOpacity>
               </View>
 
-              {clubsData.map(club => (
+              {loadingClubs ? (
+                <View style={styles.loadingContainer}>
+                  <Text style={styles.loadingText}>Loading your clubs...</Text>
+                </View>
+              ) : clubsError ? (
+                <View style={styles.errorMessageContainer}>
+                  <Feather name="alert-circle" size={24} color="#ef4444" />
+                  <Text style={styles.errorMessageText}>{clubsError}</Text>
+                  <TouchableOpacity 
+                    style={styles.retryButton} 
+                    onPress={fetchUserClubs}
+                  >
+                    <Text style={styles.retryButtonText}>Try Again</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : userClubs.length === 0 ? (
+                <View style={styles.emptyStateContainer}>
+                  <Feather name="users" size={48} color="#d1d5db" />
+                  <Text style={styles.emptyStateTitle}>No Clubs Yet</Text>
+                  <Text style={styles.emptyStateText}>You haven't joined any clubs yet. Start exploring!</Text>
+                </View>
+              ) : (
+                userClubs.map(club => (
                 <TouchableOpacity key={club.id} style={styles.clubCard}>
                   <View style={styles.clubCardHeader}>
                     <View style={styles.clubImageContainer}>
@@ -607,7 +711,8 @@ export default function Dashboard() {
                     </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
-              ))}
+              ))
+              )}
             </View>
           </ScrollView>
         );
@@ -1908,6 +2013,65 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   comingSoonText: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+
+  // Loading, Error, and Empty State Styles
+  loadingContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  errorMessageContainer: {
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fee2e2',
+    borderRadius: 16,
+    marginVertical: 20,
+  },
+  errorMessageText: {
+    fontSize: 16,
+    color: '#ef4444',
+    fontWeight: '600',
+    marginTop: 12,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyStateContainer: {
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#374151',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateText: {
     fontSize: 16,
     color: '#6b7280',
     textAlign: 'center',
