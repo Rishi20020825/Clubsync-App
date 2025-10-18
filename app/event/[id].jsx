@@ -1,9 +1,27 @@
 // app/event/[id].js - Event Details Screen
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Dimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Dimensions, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import eventsService from '../../services/EventsService';
+import { normalizeEventData, getDefaultImageForCategory } from '../../utils/eventUtils';
+import { netconfig } from '../../netconfig';
+
+// Suppress console errors in production
+if (process.env.NODE_ENV === 'production') {
+  const originalConsoleError = console.error;
+  console.error = (...args) => {
+    if (args[0] && typeof args[0] === 'string' && 
+        (args[0].includes('EventsService error') || 
+         args[0].includes('Failed to fetch'))) {
+      console.log('Suppressed error:', args[0]);
+    } else {
+      originalConsoleError.apply(console, args);
+    }
+  };
+}
 
 const { width } = Dimensions.get('window');
 
@@ -221,10 +239,195 @@ export default function EventDetailsScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const [isApplied, setIsApplied] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [event, setEvent] = useState(null);
+  const [error, setError] = useState(null);
+  const [registrationLoading, setRegistrationLoading] = useState(false);
+  const [registrationStatus, setRegistrationStatus] = useState(null);
   
-  // Find the event by ID
-  const event = MOCK_EVENTS.find(e => e.id === parseInt(id));
+  // Function to get auth token from storage
+  const getAuthToken = async () => {
+    try {
+      console.log('Inside getAuthToken function');
+      // Try multiple token keys that might be used
+      const tokenKeys = ['authToken', 'userToken', 'token', 'accessToken'];
+      let token = null;
+      
+      for (const key of tokenKeys) {
+        token = await AsyncStorage.getItem(key);
+        if (token) {
+          console.log(`Found token with key: ${key}`);
+          break;
+        }
+      }
+      
+      return token;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  };
+
+  // Function to fetch event data from API
+  const fetchEventData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      let successfulEndpoint = null;
+      let eventData = null;
+      let fetchErrors = [];
+      
+      // Try to fetch from the new endpoint format: events/[eventid]/route.tsx
+      const apiUrl = `${netconfig.API_BASE_URL}/api/events/${id}/route.tsx`;
+      console.log(`Fetching event data from: ${apiUrl}`);
+      
+      try {
+        const response = await fetch(apiUrl);
+        if (response.ok) {
+          const data = await response.json();
+          console.log('API Response from primary endpoint:', data);
+          
+          // Handle different possible API response structures
+          eventData = data.event || data.data || data;
+          
+          if (eventData) {
+            successfulEndpoint = 'primary';
+          } else {
+            fetchErrors.push('Primary endpoint returned empty data');
+          }
+        } else {
+          fetchErrors.push(`Primary endpoint returned status: ${response.status}`);
+        }
+      } catch (primaryError) {
+        console.log('Error with primary endpoint:', primaryError.message);
+        fetchErrors.push(`Primary endpoint error: ${primaryError.message}`);
+      }
+      
+      // If primary endpoint didn't succeed, try alternative direct endpoint
+      if (!successfulEndpoint) {
+        try {
+          const alternateUrl = `${netconfig.API_BASE_URL}/api/events/${id}`;
+          console.log(`Trying alternate endpoint: ${alternateUrl}`);
+          const alternateResponse = await fetch(alternateUrl);
+          
+          if (alternateResponse.ok) {
+            const alternateData = await alternateResponse.json();
+            eventData = alternateData.event || alternateData.data || alternateData;
+            
+            if (eventData) {
+              successfulEndpoint = 'alternate';
+            } else {
+              fetchErrors.push('Alternate endpoint returned empty data');
+            }
+          } else {
+            fetchErrors.push(`Alternate endpoint returned status: ${alternateResponse.status}`);
+          }
+        } catch (alternateError) {
+          console.log('Alternate endpoint error:', alternateError.message);
+          fetchErrors.push(`Alternate endpoint error: ${alternateError.message}`);
+        }
+      }
+      
+      // If we have event data from any source, use it
+      if (eventData) {
+        // Normalize the event data for consistent handling
+        const normalizedEvent = normalizeEventData(eventData);
+        console.log(`Successfully retrieved event data from ${successfulEndpoint} endpoint`);
+        console.log('Normalized event data:', normalizedEvent);
+        setEvent(normalizedEvent);
+      } else {
+        // Only show error if all methods failed
+        throw new Error(`Could not find event data. Attempted: ${fetchErrors.join(', ')}`);
+      }
+    } catch (error) {
+      console.error('Error fetching event:', error);
+      setError(`Failed to load event: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to check if user is already registered for this event
+  const checkRegistrationStatus = async () => {
+    try {
+      console.log('Attempting to get auth token...');
+      const token = await getAuthToken();
+      console.log('Auth token result:', token ? 'Token found' : 'No token found');
+      
+      if (!token) {
+        console.log('No auth token, skipping registration check');
+        return;
+      }
+      
+      const apiUrl = `${netconfig.API_BASE_URL}/api/events/mobile/registrations?eventId=${id}`;
+      console.log(`Checking registration status at: ${apiUrl}`);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        console.log(`Registration check failed with status: ${response.status}`);
+        return;
+      }
+      
+      const data = await response.json();
+      console.log('Registration status:', data);
+      
+      if (data.isRegistered) {
+        setIsApplied(true);
+        setRegistrationStatus(data.registration);
+      }
+    } catch (error) {
+      console.error('Error checking registration status:', error);
+    }
+  };
+
+  // Fetch event data and check registration when component mounts or ID changes
+  useEffect(() => {
+    fetchEventData();
+    checkRegistrationStatus();
+  }, [id]);
   
+  // Loading state
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#f97316" />
+          <Text style={styles.loadingText}>Loading event details...</Text>
+        </View>
+      </View>
+    );
+  }
+  
+  // Error state - only show if we truly failed to get any data
+  if (error && !event) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Error: {error}</Text>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.backButton, {marginTop: 10}]} 
+            onPress={() => fetchEventData()}
+          >
+            <Text style={styles.backButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+  
+  // Not found state
   if (!event) {
     return (
       <View style={styles.container}>
@@ -241,9 +444,13 @@ export default function EventDetailsScreen() {
     );
   }
 
-  const isFull = event.currentVolunteers >= event.maxVolunteers;
+  // For capacity calculation
+  const currentVolunteers = event.currentVolunteers || event.registeredCount || 0;
+  const maxVolunteers = event.maxVolunteers || event.maxCapacity || event.maxParticipants || 50;
+  const isFull = currentVolunteers >= maxVolunteers;
   
-  const handleApply = () => {
+  // Function to handle event registration
+  const handleApply = async () => {
     if (isFull) {
       Alert.alert('Event Full', 'This event has reached maximum capacity.');
       return;
@@ -261,11 +468,182 @@ export default function EventDetailsScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Apply',
-          onPress: () => {
-            setIsApplied(true);
-            Alert.alert('Success!', 'Your application has been submitted. You will receive a confirmation email shortly.');
+          onPress: async () => {
+            try {
+              setRegistrationLoading(true);
+              
+              // Get the auth token from storage (you'll need to implement this)
+              const token = await getAuthToken();
+              
+              if (!token) {
+                promptLogin();
+                return;
+              }
+              
+              // Call the registration API endpoint with potential fallbacks
+              const apiEndpoints = [
+                `${netconfig.API_BASE_URL}/api/events/mobile/registrations`,
+                `${netconfig.API_BASE_URL}/api/events/mobile/registrations`, // Added /api prefix
+                `${netconfig.API_BASE_URL}/api/events/register`
+              ];
+              
+              const apiUrl = apiEndpoints[0];
+              console.log(`Registering for event at: ${apiUrl} (with fallbacks available)`);
+              
+              // Check if the API endpoint is accessible (OPTIONS request)
+              try {
+                const checkResponse = await fetch(apiUrl, { 
+                  method: 'OPTIONS',
+                  headers: { 'Content-Type': 'application/json' }
+                });
+                console.log(`API endpoint check: ${checkResponse.status}`);
+              } catch (checkError) {
+                console.warn('API endpoint check failed:', checkError.message);
+                // Continue anyway, the main request might still work
+              }
+              
+              console.log(`Making POST request to ${apiUrl}`);
+              
+              // Create a timeout for the request
+              const controller = new AbortController();
+              const timeout = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+              
+              // Try all endpoints until one works
+              let response = null;
+              let lastError = null;
+              
+              for (let i = 0; i < apiEndpoints.length; i++) {
+                const currentUrl = apiEndpoints[i];
+                console.log(`Trying endpoint ${i + 1}/${apiEndpoints.length}: ${currentUrl}`);
+                
+                try {
+                  // Create a new controller for each attempt
+                  const currentController = new AbortController();
+                  const currentTimeout = setTimeout(() => currentController.abort(), 8000); // 8 second timeout
+                  
+                  response = await fetch(currentUrl, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                      eventId: id,
+                      eventRole: 'participant'
+                    }),
+                    signal: currentController.signal
+                  });
+                  
+                  clearTimeout(currentTimeout);
+                  console.log(`Response from endpoint ${i + 1}: Status ${response.status}`);
+                  
+                  // If this endpoint returned a success response, break the loop
+                  if (response.ok) {
+                    console.log(`Endpoint ${i + 1} succeeded!`);
+                    break;
+                  }
+                } catch (endpointError) {
+                  console.warn(`Error with endpoint ${i + 1}:`, endpointError.message);
+                  lastError = endpointError;
+                }
+              }
+              
+              // If we've tried all endpoints and none worked, throw the last error
+              if (!response) {
+                throw new Error(`All API endpoints failed. Last error: ${lastError?.message || 'Unknown error'}`);
+              }
+              
+              clearTimeout(timeout);
+              
+              // Log response details for debugging
+              console.log(`Response status: ${response.status}, Content-Type: ${response.headers.get('content-type')}`);
+              
+              // Get response text first
+              const responseText = await response.text();
+              console.log('Response first 100 chars:', responseText.substring(0, 100));
+              
+              // Try to parse as JSON
+              let data;
+              try {
+                data = JSON.parse(responseText);
+              } catch (parseError) {
+                console.error('JSON parse error:', parseError);
+                // If response contains HTML, it might be a server error page
+                if (responseText.includes('<html') || responseText.startsWith('<')) {
+                  throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}`);
+                } else {
+                  throw new Error(`Invalid JSON response. Status: ${response.status}`);
+                }
+              }
+              
+              if (!response.ok) {
+                throw new Error(data?.error || data?.message || `Failed to register for event. Status: ${response.status}`);
+              }
+              
+              // Registration successful
+              console.log('Registration successful:', data);
+              setIsApplied(true);
+              setRegistrationStatus(data);
+              
+              // Show success message
+              Alert.alert(
+                'Success!', 
+                'Your application has been submitted. You will receive a confirmation email shortly.',
+                [{ text: 'OK' }]
+              );
+              
+              // Refresh event data to get updated registration counts
+              fetchEventData();
+              
+            } catch (error) {
+              console.error('Error registering for event:', error);
+              
+              // Log additional details about the API being used
+              console.log('API Base URL:', netconfig.API_BASE_URL);
+              console.log('Event ID being registered:', id);
+              
+              // Determine a more user-friendly error message
+              let userMessage = 'Something went wrong. Please try again.';
+              
+              if (error.message.includes('JSON Parse')) {
+                userMessage = 'The server response was invalid. Our team has been notified.';
+              } else if (error.message.includes('Network request failed')) {
+                userMessage = 'Network connection error. Please check your internet connection.';
+              } else if (error.message.includes('timed out')) {
+                userMessage = 'The request timed out. Please try again later.';
+              } else if (error.message.includes('404')) {
+                userMessage = 'The registration service is currently unavailable. Please try again later.';
+              } else if (error.message.includes('401')) {
+                userMessage = 'Your session has expired. Please log in again.';
+              } else if (error.message.includes('403')) {
+                userMessage = 'You do not have permission to register for this event.';
+              } else if (error.message.includes('500')) {
+                userMessage = 'There was a server error. Our team has been notified.';
+              }
+              
+              Alert.alert(
+                'Registration Failed', 
+                userMessage,
+                [{ text: 'OK' }]
+              );
+            } finally {
+              setRegistrationLoading(false);
+            }
           }
         }
+      ]
+    );
+  };
+  
+  // We already defined getAuthToken at the top of the component
+
+  const promptLogin = () => {
+    Alert.alert(
+      'Login Required', 
+      'Please login to apply for events',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Login', onPress: () => router.push('/auth/login') }
       ]
     );
   };
@@ -280,9 +658,14 @@ export default function EventDetailsScreen() {
         {/* Hero Image Section */}
         <View style={styles.heroContainer}>
           <Image 
-            source={{ uri: event.image }} 
+            source={{ uri: event.image || event.coverImage }}
             style={styles.heroImage}
             resizeMode="cover"
+            defaultSource={{ uri: getDefaultImageForCategory(event.category) }}
+            onError={(e) => {
+              console.log('Image failed to load, using default');
+              e.target.src = getDefaultImageForCategory(event.category);
+            }}
           />
           <View style={styles.heroOverlay} />
           <TouchableOpacity 
@@ -313,8 +696,11 @@ export default function EventDetailsScreen() {
             </View>
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Date & Time</Text>
-              <Text style={styles.infoValue}>{event.date}</Text>
-              <Text style={styles.infoSubValue}>{event.time} ({event.duration})</Text>
+              <Text style={styles.infoValue}>{event.date || new Date(event.startDateTime || event.startDate || event.date).toLocaleDateString()}</Text>
+              <Text style={styles.infoSubValue}>
+                {event.time || new Date(event.startDateTime || event.startDate || event.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {event.duration && ` (${event.duration})`}
+              </Text>
             </View>
           </View>
           
@@ -324,8 +710,8 @@ export default function EventDetailsScreen() {
             </View>
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Location</Text>
-              <Text style={styles.infoValue}>{event.location}</Text>
-              <Text style={styles.infoSubValue}>{event.meetingPoint}</Text>
+              <Text style={styles.infoValue}>{event.location || event.venue || 'TBD'}</Text>
+              {event.meetingPoint && <Text style={styles.infoSubValue}>{event.meetingPoint}</Text>}
             </View>
           </View>
           
@@ -334,9 +720,9 @@ export default function EventDetailsScreen() {
               <Feather name="users" size={20} color="#f97316" />
             </View>
             <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Volunteers</Text>
+              <Text style={styles.infoLabel}>Participants</Text>
               <Text style={styles.infoValue}>
-                {event.currentVolunteers}/{event.maxVolunteers} signed up
+                {currentVolunteers}/{maxVolunteers} signed up
               </Text>
               {isFull && <Text style={styles.fullBadge}>FULL</Text>}
             </View>
@@ -344,7 +730,7 @@ export default function EventDetailsScreen() {
               <View style={styles.progressBackground}>
                 <LinearGradient
                   colors={isFull ? ['#ef4444', '#dc2626'] : ['#f97316', '#ef4444']}
-                  style={[styles.progressFill, { width: `${Math.min((event.currentVolunteers / event.maxVolunteers) * 100, 100)}%` }]}
+                  style={[styles.progressFill, { width: `${Math.min((currentVolunteers / maxVolunteers) * 100, 100)}%` }]}
                 />
               </View>
             </View>
@@ -352,86 +738,98 @@ export default function EventDetailsScreen() {
         </View>
 
         {/* Gallery Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Event Gallery</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            style={styles.galleryContainer}
-          >
-            {event.galleryImages.map((imageUri, index) => (
-              <View key={index} style={styles.galleryImageContainer}>
-                <Image 
-                  source={{ uri: imageUri }} 
-                  style={styles.galleryImage}
-                  resizeMode="cover"
-                />
-              </View>
-            ))}
-          </ScrollView>
-        </View>
+        {event.galleryImages && event.galleryImages.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Event Gallery</Text>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.galleryContainer}
+            >
+              {event.galleryImages.map((imageUri, index) => (
+                <View key={index} style={styles.galleryImageContainer}>
+                  <Image 
+                    source={{ uri: imageUri }} 
+                    style={styles.galleryImage}
+                    resizeMode="cover"
+                  />
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
 
         {/* Description */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About This Event</Text>
-          <Text style={styles.description}>{event.fullDescription}</Text>
+          <Text style={styles.description}>{event.fullDescription || event.description || 'No description available'}</Text>
         </View>
 
         {/* Requirements */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Requirements</Text>
-          <View style={styles.listContainer}>
-            {event.requirements.map((req, index) => (
-              <View key={index} style={styles.listItem}>
-                <View style={styles.bulletContainer}>
-                  <Feather name="check-circle" size={16} color="#f97316" />
+        {event.requirements && event.requirements.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Requirements</Text>
+            <View style={styles.listContainer}>
+              {event.requirements.map((req, index) => (
+                <View key={index} style={styles.listItem}>
+                  <View style={styles.bulletContainer}>
+                    <Feather name="check-circle" size={16} color="#f97316" />
+                  </View>
+                  <Text style={styles.listText}>{typeof req === 'string' ? req : JSON.stringify(req)}</Text>
                 </View>
-                <Text style={styles.listText}>{req}</Text>
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
-        </View>
+        ) : null}
 
         {/* What to Bring */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>What to Bring</Text>
-          <View style={styles.listContainer}>
-            {event.whatToBring.map((item, index) => (
-              <View key={index} style={styles.listItem}>
-                <View style={styles.bulletContainer}>
-                  <Feather name="package" size={16} color="#f97316" />
+        {event.whatToBring && event.whatToBring.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>What to Bring</Text>
+            <View style={styles.listContainer}>
+              {event.whatToBring.map((item, index) => (
+                <View key={index} style={styles.listItem}>
+                  <View style={styles.bulletContainer}>
+                    <Feather name="package" size={16} color="#f97316" />
+                  </View>
+                  <Text style={styles.listText}>{typeof item === 'string' ? item : JSON.stringify(item)}</Text>
                 </View>
-                <Text style={styles.listText}>{item}</Text>
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
-        </View>
+        ) : null}
 
         {/* Benefits */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>What You'll Get</Text>
-          <View style={styles.listContainer}>
-            {event.benefits.map((benefit, index) => (
-              <View key={index} style={styles.listItem}>
-                <View style={styles.bulletContainer}>
-                  <Feather name="star" size={16} color="#f97316" />
+        {event.benefits && event.benefits.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>What You'll Get</Text>
+            <View style={styles.listContainer}>
+              {event.benefits.map((benefit, index) => (
+                <View key={index} style={styles.listItem}>
+                  <View style={styles.bulletContainer}>
+                    <Feather name="star" size={16} color="#f97316" />
+                  </View>
+                  <Text style={styles.listText}>{typeof benefit === 'string' ? benefit : JSON.stringify(benefit)}</Text>
                 </View>
-                <Text style={styles.listText}>{benefit}</Text>
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
-        </View>
+        ) : null}
 
         {/* Contact */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contact Information</Text>
-          <TouchableOpacity style={styles.contactContainer}>
-            <View style={styles.contactIconContainer}>
-              <Feather name="mail" size={20} color="#ffffff" />
-            </View>
-            <Text style={styles.contactText}>{event.organizerContact}</Text>
-          </TouchableOpacity>
-        </View>
+        {event.organizerContact || event.contactEmail || (event.organizer && event.organizer.email) || (event.club && event.club.email) ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Contact Information</Text>
+            <TouchableOpacity style={styles.contactContainer}>
+              <View style={styles.contactIconContainer}>
+                <Feather name="mail" size={20} color="#ffffff" />
+              </View>
+              <Text style={styles.contactText}>
+                {event.organizerContact || event.contactEmail || (event.organizer && event.organizer.email) || (event.club && event.club.email)}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -468,15 +866,30 @@ export default function EventDetailsScreen() {
     </View>
   ) : (
     <TouchableOpacity 
-      style={styles.applyButton}
+      style={[styles.applyButton, 
+              (isFull || event.status === 'completed' || event.status === 'cancelled' || registrationLoading) && styles.disabledButton]}
       onPress={handleApply}
+      disabled={isFull || event.status === 'completed' || event.status === 'cancelled' || registrationLoading}
     >
       <LinearGradient
-        colors={['#f97316', '#ef4444']}
+        colors={isFull ? ['#9ca3af', '#6b7280'] : 
+                (event.status === 'completed' || event.status === 'cancelled') ? ['#9ca3af', '#6b7280'] : 
+                ['#f97316', '#ef4444']}
         style={styles.applyButtonGradient}
       >
-        <Feather name="user-plus" size={20} color="#ffffff" />
-        <Text style={styles.applyButtonText}>Apply Now</Text>
+        {registrationLoading ? (
+          <ActivityIndicator size="small" color="#ffffff" />
+        ) : (
+          <>
+            <Feather name={isFull ? "x" : "user-plus"} size={20} color="#ffffff" />
+            <Text style={styles.applyButtonText}>
+              {isFull ? 'Event Full' : 
+               (event.status === 'completed') ? 'Event Completed' :
+               (event.status === 'cancelled') ? 'Event Cancelled' :
+               registrationLoading ? 'Processing...' : 'Apply Now'}
+            </Text>
+          </>
+        )}
       </LinearGradient>
     </TouchableOpacity>
   )}
@@ -495,6 +908,34 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    color: '#ef4444',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  errorDetails: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 20,
+    textAlign: 'center',
   },
   
   // Hero Image Section
