@@ -60,7 +60,7 @@ export default function ApplyEvent() {
   
     // Here you would send the application to your backend
     Alert.alert('Success', `Applied for ${event?.title}!`);
-    router.replace('/dashboard');
+    router.replace('/home');
   };
 
   if (!event) {
