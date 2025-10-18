@@ -161,7 +161,7 @@ const CastVotePage = () => {
 
                 // Navigate to confirmation page
                 router.push({
-                    pathname: '/dashboard',
+                    pathname: '/home',
                     params: {
                         success: true,
                         votesCount: result.votesCount

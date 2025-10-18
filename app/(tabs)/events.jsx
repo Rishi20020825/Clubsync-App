@@ -9,81 +9,13 @@ import { eventsService } from '../../services/api';
 // Utility function to properly capitalize category names
 const capitalizeCategory = (category) => {
   if (!category) return '';
-  
+
   // Special handling for multi-word categories
   return category
     .split(' ')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
 };
-
-const MOCK_EVENTS = [
-  {
-    id: 1,
-    title: 'Beach Cleanup Drive',
-    description: 'Join us for a community beach cleanup to help protect marine life and keep our beaches beautiful.',
-    date: '2025-07-15',
-    time: '08:00 AM',
-    location: 'Mount Lavinia Beach',
-    maxVolunteers: 50,
-    currentVolunteers: 23,
-    category: 'Environment',
-    organizer: 'Green Earth Club',
-    image: 'https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=400&h=200&fit=crop&crop=center'
-  },
-  {
-    id: 2,
-    title: 'Food Distribution for Elderly',
-    description: 'Help distribute meals to elderly residents in the community. Make a difference in their day!',
-    date: '2025-07-08',
-    time: '11:00 AM',
-    location: 'Sarana Elder Home',
-    maxVolunteers: 20,
-    currentVolunteers: 8,
-    category: 'Community Service',
-    organizer: 'Caring Hearts Club',
-    image: 'https://images.unsplash.com/photo-1593113616828-6f22bca04804?w=400&h=200&fit=crop&crop=center'
-  },
-  {
-    id: 3,
-    title: 'Tree Planting Initiative',
-    description: 'Plant trees in the neighborhood park to create a greener environment for future generations.',
-    date: '2025-07-22',
-    time: '07:30 AM',
-    location: 'Gothatuwa Wetland Park',
-    maxVolunteers: 35,
-    currentVolunteers: 35,
-    category: 'Environment',
-    organizer: 'Nature Lovers Society',
-    image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=400&h=200&fit=crop&crop=center'
-  },
-  {
-    id: 4,
-    title: 'Reading Program for Kids',
-    description: 'Volunteer to read stories and help children improve their reading skills at the local library.',
-    date: '2025-07-12',
-    time: '02:00 PM',
-    location: 'Tampines Regional Library',
-    maxVolunteers: 15,
-    currentVolunteers: 12,
-    category: 'Education',
-    organizer: 'Book Buddies Club',
-    image: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=200&fit=crop&crop=center'
-  },
-  {
-    id: 5,
-    title: 'Animal Shelter Care',
-    description: 'Spend time caring for rescued animals, help with feeding, cleaning, and giving them love.',
-    date: '2025-07-18',
-    time: '09:00 AM',
-    location: 'SPCA Singapore',
-    maxVolunteers: 25,
-    currentVolunteers: 19,
-    category: 'Animal Welfare',
-    organizer: 'Animal Lovers Unite',
-    image: 'https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=400&h=200&fit=crop&crop=center'
-  }
-];
 
 const getCategoryColor = (category) => {
   // Standard predefined colors
@@ -94,7 +26,7 @@ const getCategoryColor = (category) => {
     'Animal Welfare': '#ec4899',
     'Health': '#ef4444'
   };
-  
+
   // If category exists in our predefined colors, use it (case-insensitive)
   if (category) {
     const capitalizedCategory = capitalizeCategory(category);
@@ -102,7 +34,7 @@ const getCategoryColor = (category) => {
       return colors[capitalizedCategory];
     }
   }
-  
+
   // Generate a deterministic color based on the category name for consistency
   if (category) {
     // Simple hash function to generate a color based on the category name
@@ -110,12 +42,12 @@ const getCategoryColor = (category) => {
     for (let i = 0; i < category.length; i++) {
       hash = category.charCodeAt(i) + ((hash << 5) - hash);
     }
-    
+
     // Convert to hex color (ensuring it's not too light or dark)
     const hue = Math.abs(hash % 360);
     return `hsl(${hue}, 70%, 45%)`;
   }
-  
+
   // Default fallback
   return '#6b7280';
 };
@@ -129,7 +61,7 @@ const getCategoryGradient = (category) => {
     'Animal Welfare': ['#ec4899', '#db2777'],
     'Health': ['#ef4444', '#dc2626']
   };
-  
+
   // If category exists in our predefined gradients, use it (case-insensitive)
   if (category) {
     const capitalizedCategory = capitalizeCategory(category);
@@ -137,11 +69,11 @@ const getCategoryGradient = (category) => {
       return gradients[capitalizedCategory];
     }
   }
-  
+
   // Generate a gradient based on the category color
   if (category) {
     const baseColor = getCategoryColor(category);
-    
+
     // Create a slightly darker shade for the second color in the gradient
     // For HSL colors
     if (baseColor.startsWith('hsl')) {
@@ -153,11 +85,11 @@ const getCategoryGradient = (category) => {
         return [baseColor, `hsl(${hue}, ${saturation}%, ${lightness}%)`];
       }
     }
-    
+
     // For hex colors or fallback
     return [baseColor, baseColor]; // Same color as fallback
   }
-  
+
   // Default fallback
   return ['#6b7280', '#4b5563'];
 };
@@ -169,65 +101,45 @@ const EventCard = ({ event, onPress, onImageError }) => {
   const isFull = maxCount > 0 && currentCount >= maxCount;
   const categoryGradient = getCategoryGradient(event.category);
   const progressPercentage = maxCount > 0 ? (currentCount / maxCount) * 100 : 0;
-  
+
   // Get appropriate default image based on category
   const getDefaultImage = (category) => {
     if (!category) return require('../../assets/2.png');
-    
+
     // Create a deterministic selection of default images based on category name
     // This ensures the same category always gets the same default image
     const defaultImages = [
-      require('../../assets/1.jpeg'),
-      require('../../assets/2.png'),
-      require('../../assets/3.png'),
-      require('../../assets/vote.jpg'),
-      require('../../assets/splash-icon.png'),
+      require('../../assets/events.png'),
     ];
-    
-    // Predefined mappings for common categories
-    const imageMapping = {
-      'environment': require('../../assets/3.png'),
-      'community service': require('../../assets/2.png'),
-      'education': require('../../assets/1.jpeg'),
-      'animal welfare': require('../../assets/vote.jpg'),
-      'health': require('../../assets/splash-icon.png'),
-      'competition': require('../../assets/1.jpeg')
-    };
-    
-    // Use predefined mapping if available
-    const lowerCaseCategory = category.toLowerCase();
-    if (imageMapping[lowerCaseCategory]) {
-      return imageMapping[lowerCaseCategory];
-    }
-    
+
     // Otherwise, choose an image deterministically based on the category name
     let hash = 0;
     for (let i = 0; i < category.length; i++) {
       hash = category.charCodeAt(i) + ((hash << 5) - hash);
     }
-    
+
     const index = Math.abs(hash) % defaultImages.length;
     return defaultImages[index];
   };
-  
+
   // Handle image loading errors
   const [imageError, setImageError] = useState(false);
-  
+
   // Get the appropriate image source
   const getImageSource = useCallback(() => {
     // If there was an error loading the image or no image URL exists
     if (imageError || event.hasImageError || (!event.coverImage && !event.image)) {
       return getDefaultImage(event.category);
     }
-    
+
     // Try to use the provided image URL
     return { uri: event.coverImage || event.image };
   }, [event.coverImage, event.image, imageError, event.hasImageError, event.category]);
-  
+
   return (
     <TouchableOpacity style={styles.eventCard} onPress={onPress}>
       <View style={styles.eventImageContainer}>
-        <Image 
+        <Image
           source={getImageSource()}
           style={styles.eventImage}
           resizeMode="cover"
@@ -238,7 +150,7 @@ const EventCard = ({ event, onPress, onImageError }) => {
           }}
         />
         <View style={styles.imageOverlay} />
-        <LinearGradient 
+        <LinearGradient
           colors={isFull ? ['#ef4444', '#dc2626'] : categoryGradient}
           style={styles.categoryBadge}
         >
@@ -247,13 +159,13 @@ const EventCard = ({ event, onPress, onImageError }) => {
           </Text>
         </LinearGradient>
       </View>
-      
+
       <View style={styles.eventContent}>
         <Text style={styles.eventTitle} numberOfLines={2}>{event.title}</Text>
         <Text style={styles.eventDescription} numberOfLines={3}>
           {event.description}
         </Text>
-        
+
         <View style={styles.eventDetails}>
           <View style={styles.detailRow}>
             <Feather name="calendar" size={16} color="#6b7280" />
@@ -283,10 +195,10 @@ const EventCard = ({ event, onPress, onImageError }) => {
           </View>
           <Text style={styles.progressText}>{Math.round(progressPercentage)}% filled</Text>
         </View>
-        
+
         <View style={styles.eventFooter}>
           <Text style={styles.organizer}>by {event.organizer?.name || (typeof event.organizer === 'string' ? event.organizer : 'Unknown')}</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.applyButton, isFull && styles.applyButtonDisabled]}
             disabled={isFull}
             onPress={onPress}
@@ -318,32 +230,32 @@ export default function EventsScreen() {
     try {
       setError(null);
       console.log('Fetching events directly from /api/events/all endpoint...');
-      
+
       const startTime = Date.now();
       // Direct API call to /api/events/all for maximum speed
       const url = `${eventsService._baseUrl}/api/events/all`;
       const response = await fetch(url);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
       const fetchedEvents = data?.events || data?.data || data || [];
       const loadTime = Date.now() - startTime;
-      
+
       console.log(`API returned ${fetchedEvents ? fetchedEvents.length : 0} events in ${loadTime}ms from ${url}`);
-      
+
       if (fetchedEvents && fetchedEvents.length > 0) {
         // Simple data normalization to ensure we have consistent field names
         const normalizedEvents = fetchedEvents.map(event => {
           // Validate image URLs to make sure they're not empty strings or invalid URLs
           const eventImage = event.coverImage || event.image;
-          const validImageUrl = eventImage && 
-            typeof eventImage === 'string' && 
-            eventImage.trim().length > 0 && 
+          const validImageUrl = eventImage &&
+            typeof eventImage === 'string' &&
+            eventImage.trim().length > 0 &&
             (eventImage.startsWith('http://') || eventImage.startsWith('https://'));
-            
+
           // Helper function to get default image URL from category
           const getDefaultImageUrl = (category) => {
             const baseCategories = {
@@ -353,14 +265,14 @@ export default function EventsScreen() {
               'animal welfare': 'animals',
               'health': 'healthcare'
             };
-            
-            const searchTerm = category && baseCategories[category.toLowerCase()] 
-              ? baseCategories[category.toLowerCase()] 
+
+            const searchTerm = category && baseCategories[category.toLowerCase()]
+              ? baseCategories[category.toLowerCase()]
               : 'volunteer';
-              
+
             return `https://source.unsplash.com/400x200/?${encodeURIComponent(searchTerm)}`;
           };
-          
+
           return {
             id: event.id,
             title: event.title,
@@ -375,9 +287,9 @@ export default function EventsScreen() {
             coverImage: validImageUrl ? eventImage : getDefaultImageUrl(event.category) // Use default image URL if original is invalid
           };
         });
-        
+
         setEvents(normalizedEvents);
-        
+
         // Extract unique categories from fetched events and update categories list
         const eventCategories = normalizedEvents
           .map(event => {
@@ -398,18 +310,18 @@ export default function EventsScreen() {
             return unique;
           }, [])
           .sort(); // Sort categories alphabetically
-          
+
         // Update categories with 'All' at the beginning plus unique categories from events
         if (eventCategories.length > 0) {
           setCategories(['All', ...eventCategories]);
           console.log(`Updated categories list with ${eventCategories.length} unique categories`);
         }
-        
+
         console.log('Successfully loaded and normalized events from /api/events/all');
       } else {
         console.warn('API returned empty events array, using mock data as fallback');
         setEvents(MOCK_EVENTS);
-        
+
         // Extract unique categories from mock events
         const mockCategories = MOCK_EVENTS
           .map(event => event.category)
@@ -423,17 +335,17 @@ export default function EventsScreen() {
             return unique;
           }, [])
           .sort();
-          
+
         setCategories(['All', ...mockCategories]);
       }
     } catch (err) {
       console.error('Error fetching events:', err);
       setError(err.message || 'Failed to load events');
-      
+
       // Use mock events as fallback
       console.log('Using mock events as fallback due to API error');
       setEvents(MOCK_EVENTS);
-      
+
       // Show error alert
       Alert.alert(
         'Error Loading Events',
@@ -479,7 +391,7 @@ export default function EventsScreen() {
   };
 
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.mainScrollContent}
@@ -492,8 +404,8 @@ export default function EventsScreen() {
       }
     >
       {/* Header Section */}
-      <LinearGradient 
-        colors={['#f97316', '#ef4444']} 
+      <LinearGradient
+        colors={['#f97316', '#ef4444']}
         style={styles.headerGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -505,16 +417,16 @@ export default function EventsScreen() {
             Find volunteering opportunities and make a difference in your community
           </Text>
           {/* Refresh button */}
-          <TouchableOpacity 
-            style={styles.refreshButton} 
+          <TouchableOpacity
+            style={styles.refreshButton}
             onPress={fetchEvents}
             disabled={loading}
           >
-            <Feather 
-              name="refresh-cw" 
-              size={20} 
-              color="#ffffff" 
-              style={loading ? { opacity: 0.6 } : {}} 
+            <Feather
+              name="refresh-cw"
+              size={20}
+              color="#ffffff"
+              style={loading ? { opacity: 0.6 } : {}}
             />
           </TouchableOpacity>
         </View>
@@ -532,9 +444,9 @@ export default function EventsScreen() {
             onChangeText={setSearchQuery}
           />
         </View>
-        
-        <ScrollView 
-          horizontal 
+
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoriesContainer}
         >
@@ -557,7 +469,7 @@ export default function EventsScreen() {
           ))}
         </ScrollView>
       </View>
-      
+
       {/* Events List */}
       <View style={styles.eventsList}>
         <View style={styles.eventsHeader}>
@@ -566,10 +478,10 @@ export default function EventsScreen() {
           </Text>
           <View style={{flexDirection: 'row', gap: 8}}>
             {__DEV__ && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => {
                   Alert.alert(
-                    "API Debug Info", 
+                    "API Debug Info",
                     `API URL: ${eventsService._baseUrl}\n` +
                     `Endpoint: /api/events/all (direct fetch)\n` +
                     `Events: ${events.length}\n` +
@@ -588,7 +500,7 @@ export default function EventsScreen() {
             </TouchableOpacity>
           </View>
         </View>
-        
+
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#f97316" />
@@ -607,7 +519,7 @@ export default function EventsScreen() {
                 onImageError={() => handleImageError(event.id)}
               />
             ))}
-            
+
             {filteredEvents.length === 0 && !loading && (
               <View style={styles.emptyState}>
                 <Feather name="calendar" size={64} color="#fed7aa" />
@@ -616,8 +528,8 @@ export default function EventsScreen() {
                   {error ? 'Unable to load events from server. Try again later.' : 'Try adjusting your search or filter criteria'}
                 </Text>
                 {error && (
-                  <TouchableOpacity 
-                    style={styles.retryButton} 
+                  <TouchableOpacity
+                    style={styles.retryButton}
                     onPress={fetchEvents}
                   >
                     <Text style={styles.retryButtonText}>Retry</Text>
@@ -637,11 +549,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff7ed',
   },
-  
+
   mainScrollContent: {
     paddingBottom: 140, // Extra space for floating tabs
   },
-  
+
   // Header Styles
   headerGradient: {
     paddingHorizontal: 24,
@@ -1001,7 +913,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
-  
+
   // Loading Styles
   loadingContainer: {
     alignItems: 'center',
@@ -1013,7 +925,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6b7280',
   },
-  
+
   // Error and Retry Styles
   retryButton: {
     marginTop: 16,
@@ -1027,7 +939,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16,
   },
-  
+
   // Debug button
   debugButton: {
     width: 32,

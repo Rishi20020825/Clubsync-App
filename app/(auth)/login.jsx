@@ -38,7 +38,7 @@ export default function LoginScreen() {
      if (data.user.role === 'eventOrganizer') {
         router.replace('/organizer/dashboard');
       } else {  
-        router.replace('/dashboard');
+        router.replace('/home');
       }
     } catch (err) {
       setError(err.message);
