@@ -225,37 +225,18 @@ class EventsService {
         return cachedEvent.data;
       }
       
-      // Try different endpoint patterns to handle different API structures
-      const endpoints = [
-        `/api/events/all/${eventId}`,              // Prioritize the /all endpoint
-        `/api/events/${eventId}`,                  // Standard REST pattern
-        `/api/events/details/${eventId}`,          // Common pattern for detail endpoints
-        `/api/events?id=${eventId}`,               // Query parameter approach
-        `/api/events/event/${eventId}`             // Another common pattern
-      ];
+      // Only use the /api/events/all/:id endpoint for faster loading
+      const endpoint = `/api/events/all/${eventId}`;
       
       let response = null;
-      let lastError = null;
       
-      // Try each endpoint until one works
-      for (const endpoint of endpoints) {
-        try {
-          console.log(`Trying endpoint for event details: ${endpoint}`);
-          response = await this._apiRequest(endpoint);
-          
-          // If we get here without an error being thrown, we succeeded
-          console.log(`Successful response from ${endpoint}`);
-          break;
-        } catch (err) {
-          lastError = err;
-          console.warn(`Endpoint ${endpoint} failed:`, err.message);
-          // Continue to next endpoint
-        }
-      }
-      
-      // If all endpoints failed, throw the last error
-      if (!response) {
-        throw lastError || new Error(`Failed to fetch event with id ${eventId}`);
+      try {
+        console.log(`Fetching event details from: ${endpoint}`);
+        response = await this._apiRequest(endpoint);
+        console.log(`Successful response from ${endpoint}`);
+      } catch (err) {
+        console.error(`Failed to fetch event details from ${endpoint}:`, err.message);
+        throw new Error(`Failed to fetch event with id ${eventId}: ${err.message}`);
       }
       
       // Handle different response formats
@@ -339,32 +320,17 @@ class EventsService {
       
       console.log('Cache not valid or force refresh requested, fetching from API');
       
-      // Try multiple endpoint patterns to handle different API structures
-      const endpoints = [
-        `/api/events/all${queryParams.toString() ? `?${queryParams.toString()}` : ''}`, // Prioritize the /all endpoint
-        `/api/events${queryParams.toString() ? `?${queryParams.toString()}` : ''}`, // Fallback to standard REST pattern
-        `/api/events/list${queryParams.toString() ? `?${queryParams.toString()}` : ''}`, // Alternative common pattern
-      ];
+      // Use only the /api/events/all endpoint for faster loading
+      const endpoint = `/api/events/all${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       
-      // Try each endpoint until one works
-      for (const endpoint of endpoints) {
-        try {
-          console.log(`Trying endpoint: ${endpoint}`);
-          response = await this._apiRequest(endpoint);
-          
-          // If we get here without an error being thrown, we succeeded
-          console.log(`Successful response from ${endpoint}`);
-          break;
-        } catch (err) {
-          error = err;
-          console.warn(`Endpoint ${endpoint} failed:`, err.message);
-          // Continue to next endpoint
-        }
-      }
-      
-      // If we've tried all endpoints and still have no response, throw the last error
-      if (!response) {
-        throw error || new Error('All API endpoints failed');
+      try {
+        console.log(`Fetching events from endpoint: ${endpoint}`);
+        response = await this._apiRequest(endpoint);
+        console.log(`Successful response from ${endpoint}`);
+      } catch (err) {
+        error = err;
+        console.error(`Failed to fetch events from ${endpoint}:`, err.message);
+        throw new Error(`Failed to fetch events: ${err.message}`);
       }
       
       // Handle various API response structures

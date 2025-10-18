@@ -7,7 +7,7 @@ export const API_CONFIG = {
   BASE_URL: netconfig.API_BASE_URL,
   ENDPOINTS: {
     EVENTS: '/api/events/all',
-    EVENT_DETAIL: '/api/events', // append /:id for specific event
+    EVENT_DETAIL: '/api/events/all', // Use the same events/all endpoint for details
     CATEGORIES: '/api/events/categories',
     REGISTER: '/api/events/register',
     AUTH: {

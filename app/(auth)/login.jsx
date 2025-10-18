@@ -1,20 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator , Alert , ScrollView , KeyboardAvoidingView,Platform,Image} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 
 import { Feather } from '@expo/vector-icons';
 import { FontAwesome } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
-import { GOOGLE_CLIENT_ID, GOOGLE_ANDROID_CLIENT_ID } from '@env';
 import { netconfig } from "../../netconfig";
-// Removed duplicate imports
-
-// Complete the auth session
-WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
   const [form, setForm] = useState({ email: '', password: '', remember: false });
@@ -24,28 +17,6 @@ export default function LoginScreen() {
   
   const [error, setError] = useState('');
   const router = useRouter();
-
-
-
-  // Google Auth Request
-  const [request, response, promptAsync] = Google.useAuthRequest({
-  expoClientId: GOOGLE_CLIENT_ID,
-  iosClientId: GOOGLE_CLIENT_ID,
-  androidClientId: GOOGLE_ANDROID_CLIENT_ID,
-  webClientId: GOOGLE_CLIENT_ID,
-  });
-
-  // Handle Google Sign-In Response
-  useEffect(() => {
-    if (response?.type === 'success') {
-      const idToken = response.authentication?.idToken;
-      if (idToken) {
-        handleGoogleLogin(idToken);
-      } else {
-        Alert.alert("Google Sign-In Error", "No ID token received from Google.");
-      }
-    }
-  }, [response]);
 
   const handleChange = (name, value) => setForm({ ...form, [name]: value });
 
@@ -73,36 +44,6 @@ export default function LoginScreen() {
       setError(err.message);
     }
     setLoading(false);
-  };
-
-  // FIX: Send idToken, not googleToken, to backend
-  const handleGoogleLogin = async (idToken) => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await fetch(`${netconfig.API_BASE_URL}/api/auth/mobile/google`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }), // <-- field name must match backend
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Google login failed');
-      await AsyncStorage.setItem('token', data.token);
-      await AsyncStorage.setItem('user', JSON.stringify(data.user));
-      router.replace('/dashboard');
-    } catch (err) {
-      setError(err.message);
-      Alert.alert("Google Login Error", err.message);
-    }
-    setLoading(false);
-  };
-
-  const handleGoogleSignIn = async () => {
-    try {
-      await promptAsync();
-    } catch (err) {
-      setError('Google sign-in failed');
-    }
   };
 
   return (
@@ -187,23 +128,6 @@ export default function LoginScreen() {
                 <Text style={styles.buttonText}>Sign In</Text>
               )}
             </LinearGradient>
-          </TouchableOpacity>
-          
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
-          </View>
-          
-          <TouchableOpacity style={styles.googleButton} onPress={() => promptAsync()}>
-            <View style={styles.googleButtonContent}>
-              <Image
-                source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
-                style={styles.googleIcon}
-                resizeMode="contain"
-              />
-              <Text style={styles.googleButtonText}>Sign in with Google</Text>
-            </View>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
             <Text style={styles.linkCenter}>Don't have an account? Register</Text>
@@ -453,57 +377,10 @@ const styles = StyleSheet.create({
     fontWeight: '600', 
     fontSize: 16 
   },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e5e7eb',
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    color: '#6b7280',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  googleButton: { 
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 12, 
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  googleButtonContent: {
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    minHeight: 56,
-  },
-  googleIcon: {
-    width: 20,
-    height: 20,
-    marginRight: 12,
-  },
-  googleButtonText: { 
-    color: '#374151', 
-    fontWeight: '600', 
-    fontSize: 16, 
-    marginLeft: 12 
-  },
   linkCenter: { 
     color: '#f97316', 
     textAlign: 'center', 
     fontWeight: '600',
     fontSize: 16,
-  },
-}); 
+  }
+});

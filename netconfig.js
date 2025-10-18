@@ -9,10 +9,10 @@ export const netconfig = {
     
     // List of URLs to try (used by findWorkingUrl)
     API_FALLBACKS: [
-        'http://10.28.82.62:3000', // Original URL
+        'http://10.21.133.101:3000', // Original URL
         'http://10.0.2.2:3000',     // Android emulator
         'http://localhost:3000',    // iOS simulator
-        'http://192.168.1.100:3000' // Common local IP
+        'http://10.21.133.101:3000' // Common local IP
     ],
     
     // Debug helper to print the URL being used
@@ -25,11 +25,11 @@ export const netconfig = {
     testUrl: async (url) => {
         console.log(`Testing URL: ${url}`);
         try {
-            // Try a simple endpoint that should always exist
+            // Try directly with the events/all endpoint that we know works
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 3000);
             
-            const response = await fetch(`${url}/api/events`, { 
+            const response = await fetch(`${url}/api/events/all`, { 
                 method: 'GET',
                 signal: controller.signal
             });
