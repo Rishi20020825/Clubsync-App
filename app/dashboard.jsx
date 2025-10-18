@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { netconfig } from '../netconfig';
 
+
 const { width } = Dimensions.get('window');
 
 const TABS = [
@@ -22,10 +23,16 @@ const TABS = [
 export default function Dashboard() {
   const [user, setUser] = useState({});
   const [activeTab, setActiveTab] = useState('home');
-  const [clubsData, setClubsData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [userClubs, setUserClubs] = useState([]);
+  const [loadingClubs, setLoadingClubs] = useState(false);
+  const [clubsError, setClubsError] = useState(null);
+  const [expandedClubs, setExpandedClubs] = useState({}); // Track which clubs are expanded
   const router = useRouter();
+
+  const [loading, setLoading] = useState(false);      // ✅ Add this
+  const [error, setError] = useState('');             // ✅ Add this
+  const [clubsData, setClubsData] = useState([]);     // ✅ Add this
+
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -46,6 +53,109 @@ export default function Dashboard() {
     fetchUser();
     fetchClubs(); // Fetch clubs when component mounts
   }, []);
+
+  // Fetch user's clubs when clubs tab is active
+  useEffect(() => {
+    if (activeTab === 'clubs' && user?.id) {
+      fetchUserClubs();
+    }
+  }, [activeTab, user?.id]);
+
+  // Function to toggle club description expansion
+  const toggleClubDescription = (clubId) => {
+    setExpandedClubs(prev => ({
+      ...prev,
+      [clubId]: !prev[clubId]
+    }));
+  };
+
+  // Function to truncate description
+  const getTruncatedDescription = (description, clubId, maxLength = 100) => {
+    if (!description) return 'No description available';
+    
+    const isExpanded = expandedClubs[clubId];
+    
+    if (description.length <= maxLength) {
+      return description;
+    }
+    
+    if (isExpanded) {
+      return description;
+    }
+    
+    return description.substring(0, maxLength) + '...';
+  };
+
+  const fetchUserClubs = async () => {
+    setLoadingClubs(true);
+    setClubsError(null);
+    
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const userData = await AsyncStorage.getItem('user');
+
+      console.log('🔑 Token:', token ? 'exists' : 'missing');
+      console.log('👤 User Data:', userData);
+      
+      if (!token || !userData) {
+        setClubsError('Please login to view your clubs');
+        setLoadingClubs(false);
+        return;
+      }
+
+      const userObj = JSON.parse(userData);
+      console.log('📝 Parsed User:', userObj);
+
+      // Use query parameter to filter clubs by userId
+      const apiUrl = `${netconfig.API_BASE_URL}/api/clubs/mobile?userId=${userObj.id}`;
+      console.log('🌐 API URL:', apiUrl);
+
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('📊 Response Status:', response.status);
+      console.log('📊 Response OK:', response.ok);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API Error:', errorText);
+        throw new Error(`Failed to fetch clubs: ${response.status}`);
+      }
+
+      const clubs = await response.json();
+      console.log('✅ Fetched Clubs:', clubs);
+      
+      // Map the API response to match the existing UI structure
+      const mappedClubs = clubs.map(club => ({
+        id: club.id,
+        name: club.name,
+        category: 'Community',
+        members: club._count?.members || 0,
+        description: club.about || club.mission || 'No description available',
+        role: club.members?.[0]?.role || 'member',
+        joined: club.members?.[0]?.joinedAt || club.createdAt,
+        status: club.isActive ? 'Active' : 'Inactive',
+        image: club.profileImage ? { uri: club.profileImage } : require('../assets/3.png'),
+        nextEvent: null,
+        achievements: [],
+      }));
+
+      console.log('📋 Mapped Clubs:', mappedClubs);
+      setUserClubs(mappedClubs);
+      
+    } catch (error) {
+      console.error('❌ Error fetching user clubs:', error);
+      console.error('❌ Error details:', error.message);
+      setClubsError('Failed to load your clubs. Please try again.');
+    } finally {
+      setLoadingClubs(false);
+    }
+  };
 
   // Feed data for home page
   const feedData = [
@@ -512,11 +622,11 @@ export default function Dashboard() {
             {/* Clubs Stats */}
             <View style={styles.clubsStatsContainer}>
               <View style={styles.clubStatCard}>
-                <Text style={styles.clubStatNumber}>{clubsData.length}</Text>
+                <Text style={styles.clubStatNumber}>{userClubs.length}</Text>
                 <Text style={styles.clubStatLabel}>Clubs Joined</Text>
               </View>
               <View style={styles.clubStatCard}>
-                <Text style={styles.clubStatNumber}>{clubsData.filter(club => club.status === 'Active').length}</Text>
+                <Text style={styles.clubStatNumber}>{userClubs.filter(club => club.status === 'Active').length}</Text>
                 <Text style={styles.clubStatLabel}>Active{'\n'}Memberships</Text>
               </View>
             </View>
@@ -531,58 +641,79 @@ export default function Dashboard() {
                 </TouchableOpacity>
               </View>
 
-              {loading ? (
-                <View style={{ alignItems: 'center', marginTop: 32 }}>
-                  <Text>Loading clubs...</Text>
+              {loadingClubs ? (
+                <View style={styles.loadingContainer}>
+                  <Text style={styles.loadingText}>Loading your clubs...</Text>
                 </View>
-              ) : error ? (
-                <View style={{ alignItems: 'center', marginTop: 32 }}>
-                  <Text style={{ color: 'red' }}>{error}</Text>
-                  <TouchableOpacity onPress={fetchClubs} style={{ marginTop: 8 }}>
-                    <Text style={{ color: '#f97316' }}>Retry</Text>
+              ) : clubsError ? (
+                <View style={styles.errorMessageContainer}>
+                  <Feather name="alert-circle" size={24} color="#ef4444" />
+                  <Text style={styles.errorMessageText}>{clubsError}</Text>
+                  <TouchableOpacity 
+                    style={styles.retryButton} 
+                    onPress={fetchUserClubs}
+                  >
+                    <Text style={styles.retryButtonText}>Try Again</Text>
                   </TouchableOpacity>
                 </View>
-              ) : clubsData.length > 0 ? (
-                clubsData.map(club => (
-                  <TouchableOpacity key={club.id} style={styles.clubCard}>
-                    <View style={styles.clubCardHeader}>
-                      <View style={styles.clubImageContainer}>
-                        <Image 
-                          source={club.image ? { uri: club.image } : require('../assets/3.png')} 
-                          style={styles.clubImage} 
-                        />
-                        <View style={[styles.clubStatusBadge, club.status === 'Active' ? styles.activeStatusBadge : styles.inactiveStatusBadge]}>
-                          <Text style={[styles.clubStatusText, club.status === 'Active' ? styles.activeStatusText : styles.inactiveStatusText]}>
-                            {club.status || 'Active'}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={styles.clubInfo}>
-                        <Text style={styles.clubName}>{club.name}</Text>
-                        <Text style={styles.clubCategory}>{club.category}</Text>
-                        <View style={styles.clubMembersRow}>
-                          <Feather name="users" size={14} color="#6b7280" />
-                          <Text style={styles.clubMembersText}>{club.members || 0} members</Text>
-                        </View>
-                      </View>
-                      <View style={styles.clubRoleContainer}>
-                        <LinearGradient
-                          colors={club.role?.includes('President') || club.role?.includes('Vice') ? ['#f59e0b', '#d97706'] : ['#3b82f6', '#1d4ed8']}
-                          style={styles.clubRoleBadge}
-                        >
-                          <Text style={styles.clubRoleText}>{club.role || 'Member'}</Text>
-                        </LinearGradient>
+              ) : userClubs.length === 0 ? (
+                <View style={styles.emptyStateContainer}>
+                  <Feather name="users" size={48} color="#d1d5db" />
+                  <Text style={styles.emptyStateTitle}>No Clubs Yet</Text>
+                  <Text style={styles.emptyStateText}>You haven't joined any clubs yet. Start exploring!</Text>
+                </View>
+              ) : (
+                userClubs.map(club => (
+                <TouchableOpacity key={club.id} style={styles.clubCard}>
+                  <View style={styles.clubCardHeader}>
+                    <View style={styles.clubImageContainer}>
+                      <Image source={club.image} style={styles.clubImage} />
+                      <View style={[styles.clubStatusBadge, club.status === 'Active' ? styles.activeStatusBadge : styles.inactiveStatusBadge]}>
+                        <Text style={[styles.clubStatusText, club.status === 'Active' ? styles.activeStatusText : styles.inactiveStatusText]}>
+                          {club.status}
+                        </Text>
                       </View>
                     </View>
-                    
-                    <Text style={styles.clubDescription}>{club.description}</Text>
-                    
-                    <View style={styles.clubDetailsRow}>
-                      <View style={styles.clubDetailItem}>
-                        <Feather name="calendar" size={14} color="#6b7280" />
-                        <Text style={styles.clubDetailText}>Joined {club.joined ? new Date(club.joined).toLocaleDateString() : 'Recently'}</Text>
+                    <View style={styles.clubInfo}>
+                      <Text style={styles.clubName}>{club.name}</Text>
+                      <Text style={styles.clubCategory}>{club.category}</Text>
+                      <View style={styles.clubMembersRow}>
+                        <Feather name="users" size={14} color="#6b7280" />
+                        <Text style={styles.clubMembersText}>{club.members} members</Text>
                       </View>
                     </View>
+                    <View style={styles.clubRoleContainer}>
+                      <LinearGradient
+                        colors={club.role.includes('President') || club.role.includes('Vice') ? ['#f59e0b', '#d97706'] : ['#3b82f6', '#1d4ed8']}
+                        style={styles.clubRoleBadge}
+                      >
+                        <Text style={styles.clubRoleText}>{club.role}</Text>
+                      </LinearGradient>
+                    </View>
+                  </View>
+                  
+                  <View>
+                    <Text style={styles.clubDescription}>
+                      {getTruncatedDescription(club.description, club.id)}
+                    </Text>
+                    {club.description && club.description.length > 100 && (
+                      <TouchableOpacity 
+                        onPress={() => toggleClubDescription(club.id)}
+                        style={styles.seeMoreButton}
+                      >
+                        <Text style={styles.seeMoreText}>
+                          {expandedClubs[club.id] ? 'See Less' : 'See More'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  
+                  <View style={styles.clubDetailsRow}>
+                    <View style={styles.clubDetailItem}>
+                      <Feather name="calendar" size={14} color="#6b7280" />
+                      <Text style={styles.clubDetailText}>Joined {new Date(club.joined).toLocaleDateString()}</Text>
+                    </View>
+                  </View>
 
                     {club.nextEvent && (
                       <View style={styles.nextEventContainer}>
@@ -591,22 +722,18 @@ export default function Dashboard() {
                       </View>
                     )}
 
-                    <View style={styles.clubFooter}>
-                      <View style={styles.achievementsContainer}>
-                        <Feather name="award" size={14} color="#10b981" />
-                        <Text style={styles.achievementsText}>{club.achievements?.length || 0} achievements</Text>
-                      </View>
-                      <TouchableOpacity style={styles.viewClubButton}>
-                        <Text style={styles.viewClubButtonText}>View Details</Text>
-                        <Feather name="arrow-right" size={14} color="#f97316" />
-                      </TouchableOpacity>
+                  <View style={styles.clubFooter}>
+                    <View style={styles.achievementsContainer}>
+                      <Feather name="award" size={14} color="#10b981" />
+                      <Text style={styles.achievementsText}>{club.achievements.length} achievements</Text>
                     </View>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <View style={{ alignItems: 'center', marginTop: 32 }}>
-                  <Text>No clubs found</Text>
-                </View>
+                    <TouchableOpacity style={styles.viewClubButton}>
+                      <Text style={styles.viewClubButtonText}>View Details</Text>
+                      <Feather name="arrow-right" size={14} color="#f97316" />
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              ))
               )}
             </View>
           </ScrollView>
@@ -1651,7 +1778,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
     lineHeight: 20,
+    marginBottom: 8,
+  },
+  seeMoreButton: {
+    alignSelf: 'flex-start',
     marginBottom: 12,
+  },
+  seeMoreText: {
+    fontSize: 13,
+    color: '#f97316',
+    fontWeight: '600',
   },
   clubDetailsRow: {
     marginBottom: 12,
@@ -1908,6 +2044,65 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   comingSoonText: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+
+  // Loading, Error, and Empty State Styles
+  loadingContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  errorMessageContainer: {
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fee2e2',
+    borderRadius: 16,
+    marginVertical: 20,
+  },
+  errorMessageText: {
+    fontSize: 16,
+    color: '#ef4444',
+    fontWeight: '600',
+    marginTop: 12,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyStateContainer: {
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#374151',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateText: {
     fontSize: 16,
     color: '#6b7280',
     textAlign: 'center',
