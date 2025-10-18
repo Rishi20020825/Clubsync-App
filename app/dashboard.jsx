@@ -8,7 +8,7 @@ import ProfileScreen from './(tabs)/profile';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { netconfig } from '../netconfig';
-import { netconfig } from '../netconfig';
+
 
 const { width } = Dimensions.get('window');
 
@@ -27,6 +27,11 @@ export default function Dashboard() {
   const [loadingClubs, setLoadingClubs] = useState(false);
   const [clubsError, setClubsError] = useState(null);
   const router = useRouter();
+
+  const [loading, setLoading] = useState(false);      // ✅ Add this
+  const [error, setError] = useState('');             // ✅ Add this
+  const [clubsData, setClubsData] = useState([]);     // ✅ Add this
+
 
   useEffect(() => {
     const fetchUser = async () => {
