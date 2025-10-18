@@ -5,16 +5,24 @@ import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { netconfig } from '../../netconfig';
+import { useRouter } from 'expo-router';
 
 export default function ClubsScreen() {
+    const router = useRouter();
+    const [activeTab, setActiveTab] = useState('your');
     const [userClubs, setUserClubs] = useState([]);
+    const [allClubs, setAllClubs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [expandedClubs, setExpandedClubs] = useState({});
 
     useEffect(() => {
-        fetchUserClubs();
-    }, []);
+        if (activeTab === 'your') {
+            fetchUserClubs();
+        } else {
+            fetchAllClubs();
+        }
+    }, [activeTab]);
 
     const fetchUserClubs = async () => {
         setLoading(true);
@@ -25,7 +33,10 @@ export default function ClubsScreen() {
                 throw new Error('Please login to view your clubs');
             }
 
-            const response = await fetch(`${netconfig.API_BASE_URL}/api/clubs/mobile`, {
+            const userData = await AsyncStorage.getItem('user');
+            const localUser = JSON.parse(userData);
+
+            const response = await fetch(`${netconfig.API_BASE_URL}/api/clubs/mobile?userId=${localUser.id}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -41,6 +52,27 @@ export default function ClubsScreen() {
         }
     };
 
+    const fetchAllClubs = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const token = await AsyncStorage.getItem('token');
+            const response = await fetch(`${netconfig.API_BASE_URL}/api/clubs`, {
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch clubs: ${response.status}`);
+            }
+            const clubs = await response.json();
+            setAllClubs(clubs);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const toggleClubDescription = (clubId) => setExpandedClubs(prev => ({ ...prev, [clubId]: !prev[clubId] }));
 
     const getTruncatedDescription = (description, clubId, maxLength = 100) => {
@@ -49,18 +81,24 @@ export default function ClubsScreen() {
         return description.substring(0, maxLength) + '...';
     };
 
-    const renderContent = () => {
+    const renderClubs = (clubs) => {
         if (loading) {
-            return <View style={styles.centerStatus}><ActivityIndicator size="large" color="#f97316" /><Text style={styles.statusText}>Loading your clubs...</Text></View>;
+            return <View style={styles.centerStatus}><ActivityIndicator size="large" color="#f97316" /><Text style={styles.statusText}>Loading clubs...</Text></View>;
         }
         if (error) {
-            return <View style={styles.centerStatus}><Feather name="alert-circle" size={48} color="#ef4444" /><Text style={styles.statusText}>{error}</Text><TouchableOpacity onPress={fetchUserClubs}><Text style={styles.retryText}>Try Again</Text></TouchableOpacity></View>;
+            return <View style={styles.centerStatus}><Feather name="alert-circle" size={48} color="#ef4444" /><Text style={styles.statusText}>{error}</Text><TouchableOpacity onPress={activeTab === 'your' ? fetchUserClubs : fetchAllClubs}><Text style={styles.retryText}>Try Again</Text></TouchableOpacity></View>;
         }
-        if (userClubs.length === 0) {
-            return <View style={styles.centerStatus}><Feather name="users" size={48} color="#d1d5db" /><Text style={styles.statusText}>You haven't joined any clubs yet.</Text></View>;
+        if (clubs.length === 0) {
+            return <View style={styles.centerStatus}><Feather name="users" size={48} color="#d1d5db" /><Text style={styles.statusText}>{activeTab === 'your' ? "You haven't joined any clubs yet." : "No clubs available to explore."}</Text></View>;
         }
-        return userClubs.map(club => (
-            <TouchableOpacity key={club.id} style={styles.clubCard}>
+        return clubs.map(club => (
+            <TouchableOpacity key={club.id} style={styles.clubCard} onPress={() => router.push({
+                pathname: '/clubDetails',
+                params: {
+                    clubId: club.id,
+                    isMember: activeTab === 'your' ? 'true' : 'false'
+                }
+            })}>
                 <View style={styles.clubCardHeader}>
                     <Image source={club.profileImage ? { uri: club.profileImage } : require('../../assets/3.png')} style={styles.clubImage} />
                     <View style={styles.clubInfo}>
@@ -81,11 +119,27 @@ export default function ClubsScreen() {
             <ScrollView style={styles.pageContainer}>
                 <LinearGradient colors={['#f97316', '#ef4444']} style={styles.pageHeader}>
                     <Feather name="users" size={32} color="#ffffff" />
-                    <Text style={styles.pageTitle}>Your Clubs</Text>
+                    <Text style={styles.pageTitle}>Clubs</Text>
                     <Text style={styles.pageSubtitle}>Connect and collaborate with amazing communities</Text>
+
+                    <View style={styles.tabContainer}>
+                        <TouchableOpacity
+                            style={[styles.tab, activeTab === 'your' && styles.activeTab]}
+                            onPress={() => setActiveTab('your')}
+                        >
+                            <Text style={[styles.tabText, activeTab === 'your' && styles.activeTabText]}>Your Clubs</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.tab, activeTab === 'explore' && styles.activeTab]}
+                            onPress={() => setActiveTab('explore')}
+                        >
+                            <Text style={[styles.tabText, activeTab === 'explore' && styles.activeTabText]}>Explore</Text>
+                        </TouchableOpacity>
+                    </View>
                 </LinearGradient>
+
                 <View style={styles.clubsListContainer}>
-                    {renderContent()}
+                    {renderClubs(activeTab === 'your' ? userClubs : allClubs)}
                 </View>
                 <View style={{ height: 120 }} />
             </ScrollView>
@@ -96,9 +150,14 @@ export default function ClubsScreen() {
 const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: '#fff' },
     pageContainer: { flex: 1 },
-    pageHeader: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 32, alignItems: 'center' },
+    pageHeader: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 24, alignItems: 'center' },
     pageTitle: { fontSize: 24, fontWeight: '700', color: '#ffffff', marginTop: 12, marginBottom: 8, textAlign: 'center' },
-    pageSubtitle: { fontSize: 16, color: '#ffffff', opacity: 0.9, textAlign: 'center' },
+    pageSubtitle: { fontSize: 16, color: '#ffffff', opacity: 0.9, textAlign: 'center', marginBottom: 20 },
+    tabContainer: { flexDirection: 'row', backgroundColor: 'rgba(255, 255, 255, 0.2)', borderRadius: 12, padding: 4, width: '100%', maxWidth: 320 },
+    tab: { flex: 1, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, alignItems: 'center' },
+    activeTab: { backgroundColor: '#ffffff' },
+    tabText: { fontSize: 14, fontWeight: '600', color: '#ffffff', opacity: 0.8 },
+    activeTabText: { color: '#f97316', opacity: 1 },
     clubsListContainer: { paddingHorizontal: 24, paddingTop: 20 },
     centerStatus: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, minHeight: 300 },
     statusText: { marginTop: 16, fontSize: 16, color: '#6b7280', textAlign: 'center' },
