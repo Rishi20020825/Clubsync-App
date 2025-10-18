@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { netconfig } from '../netconfig';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import JoinRequestModal from '../components/JoinRequestModal'; // Adjust this path if your component is elsewhere
 
 export default function ClubDetailsScreen() {
     const { clubId, isMember } = useLocalSearchParams();
@@ -15,6 +16,9 @@ export default function ClubDetailsScreen() {
     const [error, setError] = useState(null);
     const [joinRequestStatus, setJoinRequestStatus] = useState(null);
     const [submittingRequest, setSubmittingRequest] = useState(false);
+
+    // State to control the modal's visibility
+    const [isModalVisible, setModalVisible] = useState(false);
 
     useEffect(() => {
         fetchClubDetails();
@@ -44,60 +48,61 @@ export default function ClubDetailsScreen() {
 
     const checkJoinRequestStatus = async () => {
         try {
-            const token = await AsyncStorage.getItem('token');
-            const response = await fetch(`${netconfig.API_BASE_URL}/api/clubs/${clubId}/join-requests/status`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const userData = await AsyncStorage.getItem('user');
+            if (!userData) {
+                return;
+            }
+            const localUser = JSON.parse(userData);
+
+            const response = await fetch(`${netconfig.API_BASE_URL}/api/clubs/${clubId}/join-requests/status?userId=${localUser.id}`);
+
             if (response.ok) {
                 const data = await response.json();
                 setJoinRequestStatus(data.status);
             }
         } catch (err) {
-            console.error('Error checking join request:', err);
+            console.error('Error checking join request status:', err);
         }
     };
 
-    const handleJoinRequest = async () => {
-        Alert.alert(
-            'Join Club',
-            'Would you like to request to join this club?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Request',
-                    onPress: async () => {
-                        setSubmittingRequest(true);
-                        try {
-                            const token = await AsyncStorage.getItem('token');
-                            const response = await fetch(`${netconfig.API_BASE_URL}/api/clubs/${clubId}/join-requests`, {
-                                method: 'POST',
-                                headers: {
-                                    'Authorization': `Bearer ${token}`,
-                                    'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify({
-                                    motivation: 'I would like to join this club',
-                                    relevantSkills: [],
-                                    socialLinks: []
-                                })
-                            });
+    // This function handles the API submission with data from the modal
+    const submitJoinRequest = async ({ motivation, relevantSkills, socialLinks }) => {
+        setSubmittingRequest(true);
+        try {
+            const userData = await AsyncStorage.getItem('user');
+            if (!userData) {
+                throw new Error('You must be logged in to join.');
+            }
+            const localUser = JSON.parse(userData);
 
-                            if (response.ok) {
-                                Alert.alert('Success', 'Your join request has been submitted!');
-                                setJoinRequestStatus('pendingReview');
-                            } else {
-                                throw new Error('Failed to submit join request');
-                            }
-                        } catch (err) {
-                            Alert.alert('Error', err.message);
-                        } finally {
-                            setSubmittingRequest(false);
-                        }
-                    }
-                }
-            ]
-        );
+            const response = await fetch(`${netconfig.API_BASE_URL}/api/clubs/${clubId}/join-requests`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userId: localUser.id,
+                    motivation,
+                    relevantSkills,
+                    socialLinks,
+                })
+            });
+
+            if (response.ok) {
+                setModalVisible(false); // Close modal on success
+                Alert.alert('Success', 'Your join request has been submitted!');
+                setJoinRequestStatus('pendingReview');
+            } else {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to submit join request');
+            }
+        } catch (err) {
+            Alert.alert('Error', err.message);
+        } finally {
+            setSubmittingRequest(false);
+        }
     };
+
 
     const openLink = (url) => {
         if (url) Linking.openURL(url);
@@ -168,14 +173,10 @@ export default function ClubDetailsScreen() {
                         ) : (
                             <TouchableOpacity
                                 style={styles.joinButton}
-                                onPress={handleJoinRequest}
+                                onPress={() => setModalVisible(true)}
                                 disabled={submittingRequest}
                             >
-                                {submittingRequest ? (
-                                    <ActivityIndicator color="#ffffff" />
-                                ) : (
-                                    <Text style={styles.joinButtonText}>Request to Join</Text>
-                                )}
+                                <Text style={styles.joinButtonText}>Request to Join</Text>
                             </TouchableOpacity>
                         )}
                     </View>
@@ -277,6 +278,14 @@ export default function ClubDetailsScreen() {
 
                 <View style={{ height: 60 }} />
             </ScrollView>
+
+            {/* Render the Modal */}
+            <JoinRequestModal
+                visible={isModalVisible}
+                onClose={() => setModalVisible(false)}
+                onSubmit={submitJoinRequest}
+                submitting={submittingRequest}
+            />
         </SafeAreaView>
     );
 }
