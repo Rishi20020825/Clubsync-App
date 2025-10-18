@@ -131,7 +131,7 @@ export default function EventsScreen() {
 z
   const handleEventPress = (eventId) => {
     router.push(`/event/${eventId}`);
-  };
+  }; 
 
   return (
     <View style={styles.container}>
