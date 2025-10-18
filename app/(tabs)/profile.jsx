@@ -6,9 +6,12 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'rea
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { netconfig } from '../../netconfig';
+import StatsCard from '../../components/volunteer/StatsCard';
 
 export default function ProfileScreen() {
   const [user, setUser] = useState({ name: '', email: '' });
+  const [volunteerStats, setVolunteerStats] = useState(null);
+  const [loadingStats, setLoadingStats] = useState(false);
   const router = useRouter();
 
   const fetchUser = async () => {
@@ -16,8 +19,13 @@ export default function ProfileScreen() {
       const userData = await AsyncStorage.getItem('user');
       const token = await AsyncStorage.getItem('token');
       
+      console.log('📋 fetchUser - userData exists:', !!userData);
+      console.log('📋 fetchUser - token exists:', !!token);
+      
       if (userData) {
         const localUser = JSON.parse(userData);
+        console.log('📋 fetchUser - User ID:', localUser.id);
+        console.log('📋 fetchUser - User object keys:', Object.keys(localUser));
         setUser(localUser);
         
         // If we have a token, try to fetch fresh data from server
@@ -47,14 +55,224 @@ export default function ProfileScreen() {
     }
   };
 
+  const fetchVolunteerStats = async () => {
+    console.log('🚀 fetchVolunteerStats function STARTED');
+    try {
+      setLoadingStats(true);
+      console.log('⏳ Loading stats set to TRUE');
+      
+      const token = await AsyncStorage.getItem('token');
+      const userData = await AsyncStorage.getItem('user');
+      
+      console.log('🔍 Fetching volunteer stats...');
+      console.log('🔑 Token exists:', !!token);
+      console.log('📜 Token value (first 20 chars):', token ? token.substring(0, 20) + '...' : 'NULL');
+      console.log('👤 User data exists:', !!userData);
+      console.log('👤 Raw user data:', userData ? userData.substring(0, 100) + '...' : 'NULL');
+      
+      if (!token) {
+        console.log('❌ Missing token! Cannot fetch stats.');
+        setLoadingStats(false);
+        // Set default data so component shows
+        setVolunteerStats({
+          totalPoints: 0,
+          eventsParticipated: 0,
+          eventsOrganized: 0,
+          totalEvents: 0,
+          badge: 'Bronze',
+          nextBadge: 'Silver',
+          progress: 0
+        });
+        return;
+      }
+      
+      if (!userData) {
+        console.log('❌ Missing user data! Cannot fetch stats.');
+        setLoadingStats(false);
+        // Set default data so component shows
+        setVolunteerStats({
+          totalPoints: 0,
+          eventsParticipated: 0,
+          eventsOrganized: 0,
+          totalEvents: 0,
+          badge: 'Bronze',
+          nextBadge: 'Silver',
+          progress: 0
+        });
+        return;
+      }
+
+      const localUser = JSON.parse(userData);
+      console.log('👤 User ID:', JSON.stringify(localUser.id));
+      console.log('👤 Full user object:', JSON.stringify(localUser, null, 2));
+      
+      // Try different API endpoint patterns that might work
+      const possibleUrls = [
+        `${netconfig.API_BASE_URL}/api/volunteers/stats/${localUser.id}`, // Correct endpoint matching web API
+        `${netconfig.API_BASE_URL}/api/users/${localUser.id}/stats`,
+        `${netconfig.API_BASE_URL}/api/volunteer/stats?userId=${localUser.id}`,
+        `${netconfig.API_BASE_URL}/api/stats/volunteer/${localUser.id}`,
+        `${netconfig.API_BASE_URL}/api/volunteer-stats/${localUser.id}`,
+      ];
+      
+      console.log('📡 Trying API URLs:', possibleUrls);
+      console.log('🌐 API_BASE_URL from netconfig:', netconfig.API_BASE_URL);
+      console.log('🆔 User ID being used:', localUser.id);
+      
+      let finalResponse = null;
+      let workingUrl = null;
+      
+      // Try each URL until one works
+      for (const url of possibleUrls) {
+        console.log('🔍 Trying URL:', url);
+        try {
+          const testResponse = await fetch(url, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          console.log(`📥 ${url} - Status:`, testResponse.status);
+          
+          if (testResponse.ok) {
+            finalResponse = testResponse;
+            workingUrl = url;
+            console.log('✅ Found working URL:', workingUrl);
+            break;
+          }
+        } catch (error) {
+          console.log(`❌ ${url} - Error:`, error.message);
+        }
+      }
+      
+      if (!finalResponse) {
+        console.log('❌ None of the API URLs worked!');
+        // Set default data
+        setVolunteerStats({
+          totalPoints: 0,
+          eventsParticipated: 0,
+          eventsOrganized: 0,
+          totalEvents: 0,
+          badge: 'Bronze',
+          nextBadge: 'Silver',
+          progress: 0
+        });
+        setLoadingStats(false);
+        return;
+      }
+      
+      console.log('✅ Using working URL:', workingUrl);
+      const response = finalResponse;
+
+      console.log('📥 Response received! Status:', response.status);
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Full API response:', JSON.stringify(result, null, 2));
+        
+        // Backend returns data inside { success: true, data: {...} }
+        if (result.success && result.data) {
+          console.log('✅ Stats data extracted:', JSON.stringify(result.data, null, 2));
+          
+          // Log badge structure
+          console.log('🏅 Badge object:', result.data.badge);
+          console.log('🏅 Badge type:', typeof result.data.badge);
+          console.log('🏅 NextBadge object:', result.data.nextBadge);
+          
+          // Map the badge object to just the badge name/level
+          // Handle progress object - extract percentage if it's an object
+          let progressValue = 0;
+          if (result.data.progress) {
+            if (typeof result.data.progress === 'object') {
+              // If progress is an object like {current, target, percentage, eventsNeeded}
+              progressValue = result.data.progress.percentage || 0;
+              console.log('🔄 Progress is object:', result.data.progress, 'Using percentage:', progressValue);
+            } else if (typeof result.data.progress === 'number') {
+              // If progress is already a number
+              progressValue = result.data.progress;
+              console.log('🔄 Progress is number:', progressValue);
+            }
+          }
+          
+          const statsData = {
+            totalPoints: result.data.totalPoints,
+            eventsParticipated: result.data.eventsParticipated,
+            eventsOrganized: result.data.eventsOrganized,
+            totalEvents: result.data.totalEvents,
+            badge: result.data.badge?.name || result.data.badge?.level || result.data.badge || 'Bronze',
+            nextBadge: result.data.nextBadge?.name || result.data.nextBadge?.level || result.data.nextBadge || 'Silver',
+            progress: progressValue
+          };
+          
+          console.log('✅ Mapped stats data:', JSON.stringify(statsData, null, 2));
+          console.log('📊 Setting volunteerStats to:', statsData);
+          setVolunteerStats(statsData);
+        } else {
+          console.log('⚠️ API returned success=false or no data');
+          console.log('⚠️ Result object:', JSON.stringify(result, null, 2));
+          // Set default data
+          setVolunteerStats({
+            totalPoints: 0,
+            eventsParticipated: 0,
+            eventsOrganized: 0,
+            totalEvents: 0,
+            badge: 'Bronze',
+            nextBadge: 'Silver',
+            progress: 0
+          });
+        }
+      } else {
+        const errorText = await response.text();
+        console.log('❌ Failed to fetch volunteer stats! Status:', response.status);
+        console.log('❌ Error response body:', errorText);
+        // Set default data instead of hiding component
+        setVolunteerStats({
+          totalPoints: 0,
+          eventsParticipated: 0,
+          eventsOrganized: 0,
+          totalEvents: 0,
+          badge: 'Bronze',
+          nextBadge: 'Silver',
+          progress: 0
+        });
+      }
+    } catch (error) {
+      console.error('❌ EXCEPTION in fetchVolunteerStats:', error);
+      console.error('❌ Error name:', error.name);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Error stack:', error.stack);
+      // Set default data instead of hiding component
+      setVolunteerStats({
+        totalPoints: 0,
+        eventsParticipated: 0,
+        eventsOrganized: 0,
+        totalEvents: 0,
+        badge: 'Bronze',
+        nextBadge: 'Silver',
+        progress: 0
+      });
+    } finally {
+      console.log('✅ Finally block - setting loadingStats to FALSE');
+      setLoadingStats(false);
+    }
+  };
+
   useEffect(() => {
     fetchUser();
+    fetchVolunteerStats();
   }, []);
+
+  // Debug: Log when volunteerStats changes
+  useEffect(() => {
+    console.log('🔄 volunteerStats state updated:', volunteerStats);
+  }, [volunteerStats]);
 
   // Refresh data when screen comes into focus (e.g., after editing profile)
   useFocusEffect(
     React.useCallback(() => {
       fetchUser();
+      fetchVolunteerStats();
     }, [])
   );
 
@@ -139,6 +357,11 @@ export default function ProfileScreen() {
           <Feather name="edit-2" size={16} color="#f97316" />
         </TouchableOpacity>
       </LinearGradient>
+
+      {/* Volunteer Stats Card */}
+      <View style={styles.statsCardContainer}>
+        <StatsCard stats={volunteerStats} loading={loadingStats} />
+      </View>
 
       {/* Profile Stats */}
       <View style={styles.statsSection}>
@@ -285,7 +508,7 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   avatarText: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: '700',
     color: '#f97316',
   },
@@ -297,7 +520,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   userEmail: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#ffffff',
     opacity: 0.9,
     marginBottom: 12,
@@ -307,21 +530,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 6,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   membershipText: {
-    color: '#ffffff',
     fontSize: 12,
+    color: '#ffffff',
     fontWeight: '600',
     marginLeft: 4,
   },
   editButton: {
     position: 'absolute',
-    top: 40,
+    top: 32,
     right: 24,
     width: 36,
     height: 36,
@@ -336,6 +559,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 3,
+  },
+
+  // Stats Card Container
+  statsCardContainer: {
+    paddingTop: 16,
+    paddingBottom: 8,
   },
 
   // Stats Section Styles
@@ -384,7 +613,6 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     fontWeight: '500',
     textAlign: 'center',
-    fontWeight: '500',
   },
 
   // Achievements Section Styles
@@ -516,13 +744,13 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     marginRight: 8,
   },
-  newBadge: {
-    backgroundColor: '#ef4444',
-  },
   menuBadgeText: {
     fontSize: 10,
     color: '#ffffff',
     fontWeight: '600',
+  },
+  newBadge: {
+    backgroundColor: '#ef4444',
   },
   newBadgeText: {
     color: '#ffffff',

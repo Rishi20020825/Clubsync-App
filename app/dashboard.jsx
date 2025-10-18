@@ -26,6 +26,7 @@ export default function Dashboard() {
   const [userClubs, setUserClubs] = useState([]);
   const [loadingClubs, setLoadingClubs] = useState(false);
   const [clubsError, setClubsError] = useState(null);
+  const [expandedClubs, setExpandedClubs] = useState({}); // Track which clubs are expanded
   const router = useRouter();
 
   const [loading, setLoading] = useState(false);      // ✅ Add this
@@ -59,6 +60,31 @@ export default function Dashboard() {
       fetchUserClubs();
     }
   }, [activeTab, user?.id]);
+
+  // Function to toggle club description expansion
+  const toggleClubDescription = (clubId) => {
+    setExpandedClubs(prev => ({
+      ...prev,
+      [clubId]: !prev[clubId]
+    }));
+  };
+
+  // Function to truncate description
+  const getTruncatedDescription = (description, clubId, maxLength = 100) => {
+    if (!description) return 'No description available';
+    
+    const isExpanded = expandedClubs[clubId];
+    
+    if (description.length <= maxLength) {
+      return description;
+    }
+    
+    if (isExpanded) {
+      return description;
+    }
+    
+    return description.substring(0, maxLength) + '...';
+  };
 
   const fetchUserClubs = async () => {
     setLoadingClubs(true);
@@ -666,7 +692,21 @@ export default function Dashboard() {
                     </View>
                   </View>
                   
-                  <Text style={styles.clubDescription}>{club.description}</Text>
+                  <View>
+                    <Text style={styles.clubDescription}>
+                      {getTruncatedDescription(club.description, club.id)}
+                    </Text>
+                    {club.description && club.description.length > 100 && (
+                      <TouchableOpacity 
+                        onPress={() => toggleClubDescription(club.id)}
+                        style={styles.seeMoreButton}
+                      >
+                        <Text style={styles.seeMoreText}>
+                          {expandedClubs[club.id] ? 'See Less' : 'See More'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                   
                   <View style={styles.clubDetailsRow}>
                     <View style={styles.clubDetailItem}>
@@ -1738,7 +1778,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
     lineHeight: 20,
+    marginBottom: 8,
+  },
+  seeMoreButton: {
+    alignSelf: 'flex-start',
     marginBottom: 12,
+  },
+  seeMoreText: {
+    fontSize: 13,
+    color: '#f97316',
+    fontWeight: '600',
   },
   clubDetailsRow: {
     marginBottom: 12,
