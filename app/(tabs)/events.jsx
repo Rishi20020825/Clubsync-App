@@ -1,10 +1,21 @@
 // app/(tabs)/events.js - Events List Screen
-import React, { useState, useEffect} from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, Alert, RefreshControl, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, ActivityIndicator, Alert, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { eventsService } from '../../services/api';
+
+// Utility function to properly capitalize category names
+const capitalizeCategory = (category) => {
+  if (!category) return '';
+  
+  // Special handling for multi-word categories
+  return category
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
 
 const MOCK_EVENTS = [
   {
@@ -75,6 +86,7 @@ const MOCK_EVENTS = [
 ];
 
 const getCategoryColor = (category) => {
+  // Standard predefined colors
   const colors = {
     'Environment': '#10b981',
     'Community Service': '#f59e0b',
@@ -82,10 +94,34 @@ const getCategoryColor = (category) => {
     'Animal Welfare': '#ec4899',
     'Health': '#ef4444'
   };
-  return colors[category] || '#6b7280';
+  
+  // If category exists in our predefined colors, use it (case-insensitive)
+  if (category) {
+    const capitalizedCategory = capitalizeCategory(category);
+    if (colors[capitalizedCategory]) {
+      return colors[capitalizedCategory];
+    }
+  }
+  
+  // Generate a deterministic color based on the category name for consistency
+  if (category) {
+    // Simple hash function to generate a color based on the category name
+    let hash = 0;
+    for (let i = 0; i < category.length; i++) {
+      hash = category.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    // Convert to hex color (ensuring it's not too light or dark)
+    const hue = Math.abs(hash % 360);
+    return `hsl(${hue}, 70%, 45%)`;
+  }
+  
+  // Default fallback
+  return '#6b7280';
 };
 
 const getCategoryGradient = (category) => {
+  // Standard predefined gradients
   const gradients = {
     'Environment': ['#10b981', '#059669'],
     'Community Service': ['#f59e0b', '#d97706'],
@@ -93,10 +129,40 @@ const getCategoryGradient = (category) => {
     'Animal Welfare': ['#ec4899', '#db2777'],
     'Health': ['#ef4444', '#dc2626']
   };
-  return gradients[category] || ['#6b7280', '#4b5563'];
+  
+  // If category exists in our predefined gradients, use it (case-insensitive)
+  if (category) {
+    const capitalizedCategory = capitalizeCategory(category);
+    if (gradients[capitalizedCategory]) {
+      return gradients[capitalizedCategory];
+    }
+  }
+  
+  // Generate a gradient based on the category color
+  if (category) {
+    const baseColor = getCategoryColor(category);
+    
+    // Create a slightly darker shade for the second color in the gradient
+    // For HSL colors
+    if (baseColor.startsWith('hsl')) {
+      const lightnessMatch = baseColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+      if (lightnessMatch) {
+        const hue = lightnessMatch[1];
+        const saturation = lightnessMatch[2];
+        const lightness = Math.max(parseInt(lightnessMatch[3]) - 10, 30);
+        return [baseColor, `hsl(${hue}, ${saturation}%, ${lightness}%)`];
+      }
+    }
+    
+    // For hex colors or fallback
+    return [baseColor, baseColor]; // Same color as fallback
+  }
+  
+  // Default fallback
+  return ['#6b7280', '#4b5563'];
 };
 
-const EventCard = ({ event, onPress }) => {
+const EventCard = ({ event, onPress, onImageError }) => {
   // Support both field naming conventions (API vs mock data)
   const currentCount = event.currentVolunteers ?? event.registeredCount ?? 0;
   const maxCount = event.maxVolunteers ?? event.maxCapacity ?? 0;
@@ -104,13 +170,72 @@ const EventCard = ({ event, onPress }) => {
   const categoryGradient = getCategoryGradient(event.category);
   const progressPercentage = maxCount > 0 ? (currentCount / maxCount) * 100 : 0;
   
+  // Get appropriate default image based on category
+  const getDefaultImage = (category) => {
+    if (!category) return require('../../assets/2.png');
+    
+    // Create a deterministic selection of default images based on category name
+    // This ensures the same category always gets the same default image
+    const defaultImages = [
+      require('../../assets/1.jpeg'),
+      require('../../assets/2.png'),
+      require('../../assets/3.png'),
+      require('../../assets/vote.jpg'),
+      require('../../assets/splash-icon.png'),
+    ];
+    
+    // Predefined mappings for common categories
+    const imageMapping = {
+      'environment': require('../../assets/3.png'),
+      'community service': require('../../assets/2.png'),
+      'education': require('../../assets/1.jpeg'),
+      'animal welfare': require('../../assets/vote.jpg'),
+      'health': require('../../assets/splash-icon.png'),
+      'competition': require('../../assets/1.jpeg')
+    };
+    
+    // Use predefined mapping if available
+    const lowerCaseCategory = category.toLowerCase();
+    if (imageMapping[lowerCaseCategory]) {
+      return imageMapping[lowerCaseCategory];
+    }
+    
+    // Otherwise, choose an image deterministically based on the category name
+    let hash = 0;
+    for (let i = 0; i < category.length; i++) {
+      hash = category.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    const index = Math.abs(hash) % defaultImages.length;
+    return defaultImages[index];
+  };
+  
+  // Handle image loading errors
+  const [imageError, setImageError] = useState(false);
+  
+  // Get the appropriate image source
+  const getImageSource = useCallback(() => {
+    // If there was an error loading the image or no image URL exists
+    if (imageError || event.hasImageError || (!event.coverImage && !event.image)) {
+      return getDefaultImage(event.category);
+    }
+    
+    // Try to use the provided image URL
+    return { uri: event.coverImage || event.image };
+  }, [event.coverImage, event.image, imageError, event.hasImageError, event.category]);
+  
   return (
     <TouchableOpacity style={styles.eventCard} onPress={onPress}>
       <View style={styles.eventImageContainer}>
         <Image 
-          source={{ uri: event.coverImage || event.image }} 
+          source={getImageSource()}
           style={styles.eventImage}
           resizeMode="cover"
+          onError={() => {
+            console.log(`Image failed to load for event: ${event.id} - ${event.title}`);
+            setImageError(true);
+            if (onImageError) onImageError();
+          }}
         />
         <View style={styles.imageOverlay} />
         <LinearGradient 
@@ -118,7 +243,7 @@ const EventCard = ({ event, onPress }) => {
           style={styles.categoryBadge}
         >
           <Text style={styles.categoryText}>
-            {isFull ? 'FULL' : event.category}
+            {isFull ? 'FULL' : capitalizeCategory(event.category)}
           </Text>
         </LinearGradient>
       </View>
@@ -185,24 +310,121 @@ export default function EventsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-
-  const categories = ['All', 'Environment', 'Community Service', 'Education', 'Animal Welfare', 'Health'];
+  const [imageLoadErrors, setImageLoadErrors] = useState({});
+  const [categories, setCategories] = useState(['All', 'Environment', 'Community Service', 'Education', 'Animal Welfare', 'Health']);
 
   // Function to fetch events from the API
   const fetchEvents = async () => {
     try {
       setError(null);
-      console.log('Fetching events from API using /api/events/all endpoint...');
+      console.log('Fetching events directly from /api/events/all endpoint...');
       
-      const fetchedEvents = await eventsService.fetchAllEvents();
-      console.log(`API returned ${fetchedEvents ? fetchedEvents.length : 0} events`);
+      const startTime = Date.now();
+      // Direct API call to /api/events/all for maximum speed
+      const url = `${eventsService._baseUrl}/api/events/all`;
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const fetchedEvents = data?.events || data?.data || data || [];
+      const loadTime = Date.now() - startTime;
+      
+      console.log(`API returned ${fetchedEvents ? fetchedEvents.length : 0} events in ${loadTime}ms from ${url}`);
       
       if (fetchedEvents && fetchedEvents.length > 0) {
-        setEvents(fetchedEvents);
-        console.log('Successfully loaded events from /api/events/all');
+        // Simple data normalization to ensure we have consistent field names
+        const normalizedEvents = fetchedEvents.map(event => {
+          // Validate image URLs to make sure they're not empty strings or invalid URLs
+          const eventImage = event.coverImage || event.image;
+          const validImageUrl = eventImage && 
+            typeof eventImage === 'string' && 
+            eventImage.trim().length > 0 && 
+            (eventImage.startsWith('http://') || eventImage.startsWith('https://'));
+            
+          // Helper function to get default image URL from category
+          const getDefaultImageUrl = (category) => {
+            const baseCategories = {
+              'environment': 'nature',
+              'community service': 'volunteer',
+              'education': 'education',
+              'animal welfare': 'animals',
+              'health': 'healthcare'
+            };
+            
+            const searchTerm = category && baseCategories[category.toLowerCase()] 
+              ? baseCategories[category.toLowerCase()] 
+              : 'volunteer';
+              
+            return `https://source.unsplash.com/400x200/?${encodeURIComponent(searchTerm)}`;
+          };
+          
+          return {
+            id: event.id,
+            title: event.title,
+            description: event.description,
+            date: event.date || new Date(event.startDateTime).toLocaleDateString(),
+            time: event.time || new Date(event.startDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            location: event.location || event.venue,
+            maxVolunteers: event.maxVolunteers || event.maxCapacity || event.maxParticipants,
+            currentVolunteers: event.currentVolunteers || event.registeredCount || 0,
+            category: event.category,
+            organizer: event.organizer || event.club || { name: 'Unknown' },
+            coverImage: validImageUrl ? eventImage : getDefaultImageUrl(event.category) // Use default image URL if original is invalid
+          };
+        });
+        
+        setEvents(normalizedEvents);
+        
+        // Extract unique categories from fetched events and update categories list
+        const eventCategories = normalizedEvents
+          .map(event => {
+            // Ensure consistent capitalization in the stored category data
+            if (event.category) {
+              // Preserve original category in data but ensure consistent format
+              return event.category;
+            }
+            return null;
+          })
+          .filter(Boolean) // Remove null/undefined categories
+          .reduce((unique, category) => {
+            // Check for case-insensitive duplicates to avoid "Environment" and "environment" as separate filters
+            const categoryLower = category.toLowerCase();
+            if (!unique.some(cat => cat.toLowerCase() === categoryLower)) {
+              unique.push(category);
+            }
+            return unique;
+          }, [])
+          .sort(); // Sort categories alphabetically
+          
+        // Update categories with 'All' at the beginning plus unique categories from events
+        if (eventCategories.length > 0) {
+          setCategories(['All', ...eventCategories]);
+          console.log(`Updated categories list with ${eventCategories.length} unique categories`);
+        }
+        
+        console.log('Successfully loaded and normalized events from /api/events/all');
       } else {
         console.warn('API returned empty events array, using mock data as fallback');
         setEvents(MOCK_EVENTS);
+        
+        // Extract unique categories from mock events
+        const mockCategories = MOCK_EVENTS
+          .map(event => event.category)
+          .filter(Boolean)
+          .reduce((unique, category) => {
+            // Check for case-insensitive duplicates
+            const categoryLower = category.toLowerCase();
+            if (!unique.some(cat => cat.toLowerCase() === categoryLower)) {
+              unique.push(category);
+            }
+            return unique;
+          }, [])
+          .sort();
+          
+        setCategories(['All', ...mockCategories]);
       }
     } catch (err) {
       console.error('Error fetching events:', err);
@@ -242,6 +464,15 @@ export default function EventsScreen() {
     const matchesCategory = selectedCategory === 'All' || event.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  // Function to handle image errors and track which events need fallback images
+  const handleImageError = (eventId) => {
+    console.log(`Image failed to load for event ID: ${eventId}`);
+    setImageLoadErrors(prev => ({
+      ...prev,
+      [eventId]: true
+    }));
+  };
 
   const handleEventPress = (eventId) => {
     router.push(`/event/${eventId}`);
@@ -320,7 +551,7 @@ export default function EventsScreen() {
                 styles.categoryChipText,
                 selectedCategory === category && styles.categoryChipTextActive
               ]}>
-                {category}
+                {category === 'All' ? 'All' : capitalizeCategory(category)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -340,9 +571,9 @@ export default function EventsScreen() {
                   Alert.alert(
                     "API Debug Info", 
                     `API URL: ${eventsService._baseUrl}\n` +
-                    `Endpoint: /api/events/all (prioritized)\n` +
+                    `Endpoint: /api/events/all (direct fetch)\n` +
                     `Events: ${events.length}\n` +
-                    `Source: ${events === MOCK_EVENTS ? "MOCK DATA" : "API"}\n` +
+                    `Source: ${events === MOCK_EVENTS ? "MOCK DATA" : "API DIRECT"}\n` +
                     `Error: ${error || "None"}`
                   );
                 }}
@@ -368,8 +599,12 @@ export default function EventsScreen() {
             {filteredEvents.map((event) => (
               <EventCard
                 key={event.id}
-                event={event}
+                event={{
+                  ...event,
+                  hasImageError: imageLoadErrors[event.id]
+                }}
                 onPress={() => handleEventPress(event.id)}
+                onImageError={() => handleImageError(event.id)}
               />
             ))}
             
