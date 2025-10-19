@@ -8,11 +8,14 @@ import {
   Alert,
   Modal,
   Animated,
-  ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { netconfig } from '../../../netconfig';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function OrganizerEventScreen() {
   const { id: eventId } = useLocalSearchParams();
@@ -141,206 +144,533 @@ export default function OrganizerEventScreen() {
 
   if (!permission?.granted) {
     return (
-      <View style={styles.center}>
-        <Text>No camera permission</Text>
-        <TouchableOpacity style={styles.scanBtn} onPress={requestPermission}>
-          <Text style={styles.scanBtnText}>Grant Permission</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={styles.safeArea}>
+        <LinearGradient colors={['#fff7ed', '#fef2f2', '#fff']} style={styles.gradient}>
+          <View style={styles.centerContainer}>
+            <LinearGradient colors={['#f97316', '#ef4444']} style={styles.permissionIcon}>
+              <Feather name="camera-off" size={48} color="#ffffff" />
+            </LinearGradient>
+            <Text style={styles.permissionTitle}>Camera Permission Required</Text>
+            <Text style={styles.permissionText}>We need camera access to scan QR codes for attendance</Text>
+            <TouchableOpacity style={styles.permissionButtonContainer} onPress={requestPermission}>
+              <LinearGradient colors={['#f97316', '#ef4444']} style={styles.permissionButton}>
+                <Feather name="unlock" size={18} color="#ffffff" />
+                <Text style={styles.permissionButtonText}>Grant Permission</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-
-      {/* Header with Back button and Title */}
-      <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backBtnText}>Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.heading}>Event Attendance</Text>
-      </View>
-
-      <Text style={styles.subText}>Event ID: {eventId}</Text>
-
-      {loading ? (
-        <Text>Loading attendance...</Text>
-      ) : (
-        <>
-          <View style={styles.tabs}>
-            {/* Arrived List */}
-            <View style={styles.tab}>
-              <Text style={styles.tabTitle}>Arrived ({attended.length})</Text>
-              <FlatList
-                data={attended}
-                keyExtractor={(item) => item.userId}
-                renderItem={({ item }) => (
-                  <View style={styles.userCard}>
-                    <Text>{item.userName}</Text>
-                    <Text style={styles.time}>{formatTime(item.arrivedTime)}</Text>
-                  </View>
-                )}
-              />
+    <SafeAreaView style={styles.safeArea}>
+      <LinearGradient colors={['#fff7ed', '#fef2f2', '#fff']} style={styles.gradient}>
+        <View style={styles.container}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+              <Feather name="arrow-left" size={24} color="#f97316" />
+            </TouchableOpacity>
+            <View style={styles.headerTitleContainer}>
+              <Text style={styles.headerTitle}>Event Attendance</Text>
+              <Text style={styles.headerSubtitle}>ID: {eventId}</Text>
             </View>
-
-            {/* Not Arrived List */}
-            <View style={styles.tab}>
-              <Text style={styles.tabTitle}>Not Arrived ({notAttended.length})</Text>
-              <FlatList
-                data={notAttended}
-                keyExtractor={(item) => item.userId}
-                renderItem={({ item }) => (
-                  <View style={styles.userCard}>
-                    <Text>{item.userName}</Text>
-                  </View>
-                )}
-              />
-            </View>
+            <View style={{ width: 40 }} />
           </View>
 
-          <TouchableOpacity 
-            style={[styles.scanBtn, markingAttendance && styles.scanBtnDisabled]} 
-            onPress={() => setScanning(true)}
-            disabled={markingAttendance}
-          >
-            {markingAttendance ? (
-              <View style={styles.loadingContainer}>
-                <View style={styles.loadingDots}>
-                  <Animated.View style={[styles.loadingDot, { opacity: dot1Anim }]} />
-                  <Animated.View style={[styles.loadingDot, { opacity: dot2Anim }]} />
-                  <Animated.View style={[styles.loadingDot, { opacity: dot3Anim }]} />
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Loading attendance...</Text>
+            </View>
+          ) : (
+            <View style={styles.contentContainer}>
+              {/* Stats Cards */}
+              <View style={styles.statsRow}>
+                <View style={styles.statCardContainer}>
+                  <LinearGradient colors={['#10b981', '#059669']} style={styles.statCard}>
+                    <Feather name="check-circle" size={28} color="#ffffff" />
+                    <Text style={styles.statNumber}>{attended.length}</Text>
+                    <Text style={styles.statLabel}>Arrived</Text>
+                  </LinearGradient>
                 </View>
-                <Text style={styles.scanBtnText}>Processing Attendance...</Text>
+                <View style={styles.statCardContainer}>
+                  <LinearGradient colors={['#f59e0b', '#d97706']} style={styles.statCard}>
+                    <Feather name="clock" size={28} color="#ffffff" />
+                    <Text style={styles.statNumber}>{notAttended.length}</Text>
+                    <Text style={styles.statLabel}>Pending</Text>
+                  </LinearGradient>
+                </View>
               </View>
-            ) : (
-              <Text style={styles.scanBtnText}>Scan QR to Mark Attendance</Text>
-            )}
-          </TouchableOpacity>
 
-          {/* Scanner Modal */}
-          <Modal visible={scanning} animationType="fade" transparent>
-            <Animated.View style={[styles.fullScreenWrapper, { transform: [{ translateY: slideAnim }] }]}>
-              <CameraView
-                style={styles.camera}
-                facing="back"
-                onBarcodeScanned={handleBarCodeScanned}
-                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-              />
-              <View style={styles.overlay} />
-              <View style={styles.guideFrame} />
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setScanning(false)}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
+              {/* Attendance Lists */}
+              <ScrollView style={styles.listsContainer} showsVerticalScrollIndicator={false}>
+                {/* Arrived List */}
+                <View style={styles.listSection}>
+                  <View style={styles.listHeader}>
+                    <Feather name="check-circle" size={20} color="#10b981" />
+                    <Text style={styles.listTitle}>Arrived ({attended.length})</Text>
+                  </View>
+                  <View>
+                    {attended.map((item) => (
+                      <View key={item.userId} style={styles.userCard}>
+                        <View style={styles.userIconContainer}>
+                          <LinearGradient colors={['#10b981', '#059669']} style={styles.userIcon}>
+                            <Feather name="user" size={16} color="#ffffff" />
+                          </LinearGradient>
+                        </View>
+                        <View style={styles.userInfo}>
+                          <Text style={styles.userName}>{item.userName}</Text>
+                          <View style={styles.timeRow}>
+                            <Feather name="clock" size={12} color="#10b981" />
+                            <Text style={styles.timeText}>{formatTime(item.arrivedTime)}</Text>
+                          </View>
+                        </View>
+                        <Feather name="check" size={20} color="#10b981" />
+                      </View>
+                    ))}
+                    {attended.length === 0 && (
+                      <View style={styles.emptyList}>
+                        <Feather name="inbox" size={32} color="#d1d5db" />
+                        <Text style={styles.emptyListText}>No arrivals yet</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                {/* Not Arrived List */}
+                <View style={styles.listSection}>
+                  <View style={styles.listHeader}>
+                    <Feather name="clock" size={20} color="#f59e0b" />
+                    <Text style={styles.listTitle}>Pending ({notAttended.length})</Text>
+                  </View>
+                  <View>
+                    {notAttended.map((item) => (
+                      <View key={item.userId} style={styles.userCard}>
+                        <View style={styles.userIconContainer}>
+                          <LinearGradient colors={['#f59e0b', '#d97706']} style={styles.userIcon}>
+                            <Feather name="user" size={16} color="#ffffff" />
+                          </LinearGradient>
+                        </View>
+                        <View style={styles.userInfo}>
+                          <Text style={styles.userName}>{item.userName}</Text>
+                        </View>
+                        <Feather name="more-horizontal" size={20} color="#d1d5db" />
+                      </View>
+                    ))}
+                    {notAttended.length === 0 && (
+                      <View style={styles.emptyList}>
+                        <Feather name="users" size={32} color="#d1d5db" />
+                        <Text style={styles.emptyListText}>All checked in!</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                <View style={{ height: 100 }} />
+              </ScrollView>
+
+              {/* Scan Button */}
+              <TouchableOpacity 
+                style={styles.scanButtonContainer} 
+                onPress={() => setScanning(true)}
+                activeOpacity={0.8}
+              >
+                <LinearGradient colors={['#f97316', '#ef4444']} style={styles.scanButton}>
+                  <Feather name="camera" size={24} color="#ffffff" />
+                  <Text style={styles.scanButtonText}>Scan QR Code</Text>
+                </LinearGradient>
               </TouchableOpacity>
-            </Animated.View>
-          </Modal>
-        </>
-      )}
-    </View>
+
+              {/* Scanner Modal */}
+              <Modal visible={scanning} animationType="fade" transparent>
+                <Animated.View style={[styles.fullScreenWrapper, { transform: [{ translateY: slideAnim }] }]}>
+                  <CameraView
+                    style={styles.camera}
+                    facing="back"
+                    onBarcodeScanned={handleBarCodeScanned}
+                    barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                  />
+                  <View style={styles.overlay} />
+                  
+                  {/* Scanner UI */}
+                  <View style={styles.scannerUI}>
+                    <Text style={styles.scannerTitle}>Scan Attendance QR</Text>
+                    <Text style={styles.scannerSubtitle}>Align QR code within the frame</Text>
+                  </View>
+                  
+                  <View style={styles.guideFrame}>
+                    <View style={[styles.corner, styles.topLeft]} />
+                    <View style={[styles.corner, styles.topRight]} />
+                    <View style={[styles.corner, styles.bottomLeft]} />
+                    <View style={[styles.corner, styles.bottomRight]} />
+                  </View>
+                  
+                  <TouchableOpacity 
+                    style={styles.cancelButtonContainer} 
+                    onPress={() => setScanning(false)}
+                  >
+                    <LinearGradient colors={['#ef4444', '#dc2626']} style={styles.cancelButton}>
+                      <Feather name="x" size={20} color="#ffffff" />
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </Animated.View>
+              </Modal>
+            </View>
+          )}
+        </View>
+      </LinearGradient>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#fff' },
-  headerRow: {
+  safeArea: { 
+    flex: 1, 
+    backgroundColor: '#fff7ed' 
+  },
+  gradient: { 
+    flex: 1 
+  },
+  container: { 
+    flex: 1 
+  },
+  header: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6'
+  },
+  backButton: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    backgroundColor: '#fff7ed', 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#fed7aa'
+  },
+  headerTitleContainer: { 
+    flex: 1, 
+    alignItems: 'center' 
+  },
+  headerTitle: { 
+    fontSize: 18, 
+    fontWeight: '700', 
+    color: '#000000' 
+  },
+  headerSubtitle: { 
+    fontSize: 12, 
+    color: '#6b7280', 
+    fontWeight: '500',
+    marginTop: 2
+  },
+  contentContainer: { 
+    flex: 1, 
+    padding: 20 
+  },
+  statsRow: { 
+    flexDirection: 'row', 
+    gap: 12, 
+    marginBottom: 24 
+  },
+  statCardContainer: { 
+    flex: 1,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8
+  },
+  statCard: { 
+    padding: 20, 
+    alignItems: 'center'
+  },
+  statNumber: { 
+    fontSize: 36, 
+    fontWeight: '800', 
+    color: '#ffffff', 
+    marginTop: 8,
+    marginBottom: 4
+  },
+  statLabel: { 
+    fontSize: 13, 
+    color: 'rgba(255, 255, 255, 0.9)', 
+    fontWeight: '600' 
+  },
+  listsContainer: { 
+    flex: 1,
+    paddingBottom: 100
+  },
+  listSection: { 
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4
+  },
+  listHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 8,
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6'
+  },
+  listTitle: { 
+    fontSize: 16, 
+    fontWeight: '700', 
+    color: '#000000' 
+  },
+  listScroll: { 
+    flex: 1 
+  },
+  userCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
-  },
-  backBtn: {
-    backgroundColor: '#f59e0b',
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 6,
-    marginRight: 12,
-    elevation: 3,
-  },
-  backBtnText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  heading: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  subText: { fontSize: 14, color: '#555', marginBottom: 16 },
-  tabs: { flexDirection: 'row', flex: 1 },
-  tab: { flex: 1, marginHorizontal: 4 },
-  tabTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 8 },
-  userCard: {
-    padding: 12,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  time: { color: '#10b981', fontSize: 13 },
-  scanBtn: {
-    position: 'absolute',
-    bottom: 80,
-    left: '10%',
-    right: '10%',
-    backgroundColor: '#f59e0b',
-    padding: 20,
+    backgroundColor: '#f9fafb',
     borderRadius: 12,
-    alignItems: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#f3f4f6'
   },
-  scanBtnDisabled: {
-    backgroundColor: '#f59e0b88', // Semi-transparent version of the button
+  userIconContainer: { 
+    marginRight: 10 
   },
-  scanBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  loadingContainer: {
+  userIcon: { 
+    width: 36, 
+    height: 36, 
+    borderRadius: 18, 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+  userInfo: { 
+    flex: 1 
+  },
+  userName: { 
+    fontSize: 14, 
+    fontWeight: '600', 
+    color: '#000000',
+    marginBottom: 4
+  },
+  timeRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 4 
+  },
+  timeText: { 
+    fontSize: 12, 
+    color: '#10b981', 
+    fontWeight: '500' 
+  },
+  emptyList: { 
+    alignItems: 'center', 
+    paddingVertical: 40 
+  },
+  emptyListText: { 
+    fontSize: 14, 
+    color: '#9ca3af', 
+    marginTop: 8,
+    fontWeight: '500'
+  },
+  scanButtonContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#f97316',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 10
+  },
+  scanButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 12,
+    paddingVertical: 18
   },
-  loadingDots: {
+  scanButtonText: { 
+    color: '#ffffff', 
+    fontWeight: '700', 
+    fontSize: 16 
+  },
+  loadingContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  loadingText: { 
+    fontSize: 16, 
+    color: '#6b7280',
+    fontWeight: '500'
+  },
+  centerContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    padding: 40
+  },
+  permissionIcon: { 
+    width: 96, 
+    height: 96, 
+    borderRadius: 48, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    marginBottom: 24,
+    shadowColor: '#f97316',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 10
+  },
+  permissionTitle: { 
+    fontSize: 24, 
+    fontWeight: '700', 
+    color: '#000000',
+    marginBottom: 8,
+    textAlign: 'center'
+  },
+  permissionText: { 
+    fontSize: 16, 
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 32,
+    fontWeight: '500',
+    lineHeight: 24
+  },
+  permissionButtonContainer: { 
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#f97316',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8
+  },
+  permissionButton: { 
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 10,
+    gap: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 32
   },
-  loadingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#fff',
-    marginHorizontal: 2,
+  permissionButtonText: { 
+    color: '#ffffff', 
+    fontWeight: '700', 
+    fontSize: 16 
   },
-  loadingDot1: {
-    opacity: 0.4,
+  fullScreenWrapper: { 
+    flex: 1, 
+    backgroundColor: '#000' 
   },
-  loadingDot2: {
-    opacity: 0.7,
+  camera: { 
+    ...StyleSheet.absoluteFillObject 
   },
-  loadingDot3: {
-    opacity: 1,
+  overlay: { 
+    ...StyleSheet.absoluteFillObject, 
+    backgroundColor: 'rgba(0,0,0,0.6)' 
   },
-  fullScreenWrapper: { flex: 1, backgroundColor: '#000' },
-  camera: { ...StyleSheet.absoluteFillObject },
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  scannerUI: {
+    position: 'absolute',
+    top: 80,
+    alignSelf: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40
+  },
+  scannerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 8
+  },
+  scannerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    fontWeight: '500'
+  },
   guideFrame: {
     position: 'absolute',
     top: '35%',
-    left: '20%',
-    width: '60%',
-    height: '30%',
-    borderColor: '#f59e0b',
-    borderWidth: 3,
-    borderRadius: 8,
+    left: '15%',
+    width: '70%',
+    height: '30%'
   },
-  cancelBtn: {
+  corner: {
     position: 'absolute',
-    bottom: 40,
-    alignSelf: 'center',
-    backgroundColor: '#f59e0b',
-    paddingVertical: 12,
-    paddingHorizontal: 25,
-    borderRadius: 8,
+    width: 40,
+    height: 40,
+    borderColor: '#f97316',
+    borderWidth: 4
   },
-  cancelBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 18 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  topLeft: {
+    top: 0,
+    left: 0,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 12
+  },
+  topRight: {
+    top: 0,
+    right: 0,
+    borderLeftWidth: 0,
+    borderBottomWidth: 0,
+    borderTopRightRadius: 12
+  },
+  bottomLeft: {
+    bottom: 0,
+    left: 0,
+    borderRightWidth: 0,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 12
+  },
+  bottomRight: {
+    bottom: 0,
+    right: 0,
+    borderLeftWidth: 0,
+    borderTopWidth: 0,
+    borderBottomRightRadius: 12
+  },
+  cancelButtonContainer: {
+    position: 'absolute',
+    bottom: 60,
+    alignSelf: 'center',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 10
+  },
+  cancelButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 32
+  },
+  cancelButtonText: { 
+    color: '#ffffff', 
+    fontWeight: '700', 
+    fontSize: 16 
+  }
 });
