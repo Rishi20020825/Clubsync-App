@@ -24,44 +24,14 @@ export default function OrganizerEventScreen() {
   const [attended, setAttended] = useState([]);
   const [notAttended, setNotAttended] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [markingAttendance, setMarkingAttendance] = useState(false);
   const [scanning, setScanning] = useState(false);
 
   const [permission, requestPermission] = useCameraPermissions();
   const slideAnim = useRef(new Animated.Value(1000)).current;
-  const dot1Anim = useRef(new Animated.Value(0.4)).current;
-  const dot2Anim = useRef(new Animated.Value(0.7)).current;
-  const dot3Anim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (!permission) requestPermission();
   }, [permission]);
-  
-  // Animate the loading dots when marking attendance
-  useEffect(() => {
-    if (markingAttendance) {
-      // Create sequence of animations for each dot
-      Animated.loop(
-        Animated.sequence([
-          Animated.parallel([
-            Animated.timing(dot1Anim, { toValue: 1, duration: 500, useNativeDriver: true }),
-            Animated.timing(dot2Anim, { toValue: 0.4, duration: 500, useNativeDriver: true }),
-            Animated.timing(dot3Anim, { toValue: 0.7, duration: 500, useNativeDriver: true }),
-          ]),
-          Animated.parallel([
-            Animated.timing(dot1Anim, { toValue: 0.7, duration: 500, useNativeDriver: true }),
-            Animated.timing(dot2Anim, { toValue: 1, duration: 500, useNativeDriver: true }),
-            Animated.timing(dot3Anim, { toValue: 0.4, duration: 500, useNativeDriver: true }),
-          ]),
-          Animated.parallel([
-            Animated.timing(dot1Anim, { toValue: 0.4, duration: 500, useNativeDriver: true }),
-            Animated.timing(dot2Anim, { toValue: 0.7, duration: 500, useNativeDriver: true }),
-            Animated.timing(dot3Anim, { toValue: 1, duration: 500, useNativeDriver: true }),
-          ]),
-        ])
-      ).start();
-    }
-  }, [markingAttendance]);
 
   useEffect(() => {
     if (eventId) fetchAttendance();
@@ -91,22 +61,12 @@ export default function OrganizerEventScreen() {
 
   const handleBarCodeScanned = async ({ data }) => {
     setScanning(false);
-    setMarkingAttendance(true);
     try {
       const { eventId: scannedEventId, userId } = JSON.parse(data);
       if (String(scannedEventId) !== String(eventId)) {
         Alert.alert('Invalid QR', 'This QR is not for this event.');
-        setMarkingAttendance(false);
         return;
       }
-
-      // Show a temporary loading message
-      Alert.alert(
-        'Processing',
-        'Marking attendance...',
-        [],
-        { cancelable: false }
-      );
 
       const res = await fetch(`${netconfig.API_BASE_URL}/api/events/${eventId}/attendance`, {
         method: 'POST',
@@ -115,8 +75,6 @@ export default function OrganizerEventScreen() {
       });
 
       const result = await res.json();
-      
-      // Dismiss the loading alert by showing the result alert
       if (result.success) {
         Alert.alert('Success', 'Attendance marked!');
         fetchAttendance();
@@ -126,8 +84,6 @@ export default function OrganizerEventScreen() {
     } catch (err) {
       console.error('QR Scan error:', err);
       Alert.alert('Error', 'Invalid QR code format.');
-    } finally {
-      setMarkingAttendance(false);
     }
   };
 
