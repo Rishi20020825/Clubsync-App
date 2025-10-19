@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { eventsService } from '../../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Utility function to properly capitalize category names
 const capitalizeCategory = (category) => {
@@ -94,7 +95,7 @@ const getCategoryGradient = (category) => {
   return ['#6b7280', '#4b5563'];
 };
 
-const EventCard = ({ event, onPress, onImageError }) => {
+const EventCard = ({ event, onPress, onImageError, isRegistered }) => {
   // Support both field naming conventions (API vs mock data)
   const currentCount = event.currentVolunteers ?? event.registeredCount ?? 0;
   const maxCount = event.maxVolunteers ?? event.maxCapacity ?? 0;
@@ -158,6 +159,18 @@ const EventCard = ({ event, onPress, onImageError }) => {
             {isFull ? 'FULL' : capitalizeCategory(event.category)}
           </Text>
         </LinearGradient>
+        
+        {isRegistered && (
+          <LinearGradient
+            colors={['#10b981', '#059669']}
+            style={styles.registeredBadge}
+          >
+            <Feather name="check-circle" size={12} color="#ffffff" style={{marginRight: 4}} />
+            <Text style={styles.registeredText}>
+              Registered
+            </Text>
+          </LinearGradient>
+        )}
       </View>
 
       <View style={styles.eventContent}>
@@ -197,16 +210,24 @@ const EventCard = ({ event, onPress, onImageError }) => {
         </View>
 
         <View style={styles.eventFooter}>
-          <Text style={styles.organizer}>by {event.organizer?.name || (typeof event.organizer === 'string' ? event.organizer : 'Unknown')}</Text>
+          <Text style={styles.organizer}>by {event.organizer?.name || 'Unknown'}</Text>
           <TouchableOpacity
-            style={[styles.applyButton, isFull && styles.applyButtonDisabled]}
+            style={[
+              styles.applyButton, 
+              isFull && styles.applyButtonDisabled,
+              isRegistered && styles.registeredButton
+            ]}
             disabled={isFull}
             onPress={onPress}
           >
-            <Text style={[styles.applyButtonText, isFull && styles.applyButtonTextDisabled]}>
-              {isFull ? 'Full' : 'View Details'}
+            <Text style={[
+              styles.applyButtonText, 
+              isFull && styles.applyButtonTextDisabled,
+              isRegistered && styles.registeredButtonText
+            ]}>
+              {isFull ? 'Full' : isRegistered ? 'Registered' : 'View Details'}
             </Text>
-            {!isFull && <Feather name="arrow-right" size={14} color="#ffffff" />}
+            {!isFull && <Feather name={isRegistered ? "check" : "arrow-right"} size={14} color={isRegistered ? "#10b981" : "#ffffff"} />}
           </TouchableOpacity>
         </View>
       </View>
@@ -216,23 +237,180 @@ const EventCard = ({ event, onPress, onImageError }) => {
 
 export default function EventsScreen() {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState('explore'); // 'explore' or 'your'
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [events, setEvents] = useState([]);
+  const [exploreEvents, setExploreEvents] = useState([]);
+  const [yourEvents, setYourEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [imageLoadErrors, setImageLoadErrors] = useState({});
   const [categories, setCategories] = useState(['All', 'Environment', 'Community Service', 'Education', 'Animal Welfare', 'Health']);
+  const [userId, setUserId] = useState(null);
 
-  // Function to fetch events from the API
-  const fetchEvents = async () => {
+  // Get user ID from AsyncStorage
+  const getUserId = async () => {
     try {
-      setError(null);
-      console.log('Fetching events directly from /api/events/all endpoint...');
+      const userData = await AsyncStorage.getItem('userData');
+      if (userData) {
+        const parsedData = JSON.parse(userData);
+        if (parsedData.id) {
+          setUserId(parsedData.id);
+          return parsedData.id;
+        } else {
+          console.warn('User data found but no ID present:', parsedData);
+        }
+      } else {
+        // Create a default user ID for demo purposes
+        // In a production app, you would redirect to login instead
+        const defaultId = 'demo-user-' + Date.now().toString().slice(-6);
+        const defaultUserData = { id: defaultId, name: 'Demo User' };
+        await AsyncStorage.setItem('userData', JSON.stringify(defaultUserData));
+        
+        // Also create some demo event registrations for testing
+        const demoEventRegistrations = [
+          { eventId: 'cmgxd1oe3001wv71o0v9n4cqf', userId: defaultId, date: new Date().toISOString() },
+          { eventId: 'cmgx9m78m0005v71o2hjkqkwp', userId: defaultId, date: new Date().toISOString() }
+        ];
+        await AsyncStorage.setItem('eventRegistrations', JSON.stringify(demoEventRegistrations));
+        
+        setUserId(defaultId);
+        console.log('Created demo user with ID:', defaultId);
+        console.log('Created demo event registrations for testing');
+        return defaultId;
+      }
+    } catch (error) {
+      console.error('Error getting user ID:', error);
+    }
+    return null;
+  };
 
-      const startTime = Date.now();
-      // Direct API call to /api/events/all for maximum speed
+  // Helper function to normalize event data
+  const normalizeEventData = (event) => {
+    // For debugging
+    console.log('Normalizing event:', JSON.stringify(event, null, 2));
+    
+    // Validate image URLs
+    const eventImage = event.coverImage || event.image;
+    const validImageUrl = eventImage &&
+      typeof eventImage === 'string' &&
+      eventImage.trim().length > 0 &&
+      (eventImage.startsWith('http://') || eventImage.startsWith('https://'));
+
+    // Helper function to get default image URL from category
+    const getDefaultImageUrl = (category) => {
+      const baseCategories = {
+        'environment': 'nature',
+        'community service': 'volunteer',
+        'education': 'education',
+        'animal welfare': 'animals',
+        'health': 'healthcare'
+      };
+
+      const searchTerm = category && typeof category === 'string' && baseCategories[category.toLowerCase()]
+        ? baseCategories[category.toLowerCase()]
+        : 'volunteer';
+
+      return `https://source.unsplash.com/400x200/?${encodeURIComponent(searchTerm)}`;
+    };
+    
+    // Handle possible missing or undefined fields
+    const safeEvent = {
+      id: event.id || 'unknown-id',
+      title: event.title || 'Untitled Event',
+      description: event.description || 'No description available',
+      startDateTime: event.startDateTime || new Date().toISOString(),
+      venue: event.venue || event.location || 'No location specified',
+      category: event.category || 'Other',
+      maxParticipants: event.maxParticipants || event.maxVolunteers || event.maxCapacity || 0,
+      registeredCount: event.registeredCount || event.currentVolunteers || 0
+    };
+    
+    // Ensure consistent date formatting for sorting purposes
+    // Parse the date from the event object
+    let eventDate = new Date();
+    
+    // Try to extract date from different possible fields
+    if (event.startDateTime) {
+      eventDate = new Date(event.startDateTime);
+    } else if (event.startDate) {
+      eventDate = new Date(event.startDate);
+    } else if (event.date && event.time) {
+      // If we have separate date and time strings, try to combine them
+      const combinedDateTime = `${event.date} ${event.time}`;
+      const parsedDate = new Date(combinedDateTime);
+      if (!isNaN(parsedDate.getTime())) {
+        eventDate = parsedDate;
+      }
+    } else if (event.date) {
+      // Try to parse the date string
+      const parsedDate = new Date(event.date);
+      if (!isNaN(parsedDate.getTime())) {
+        eventDate = parsedDate;
+      }
+    }
+    
+    // Make sure the date is valid, otherwise keep the current date
+    if (isNaN(eventDate.getTime())) {
+      eventDate = new Date();
+    }
+    
+    // Format the startDateTime consistently for both tabs
+    const startDateTime = eventDate.toISOString();
+    
+    return {
+      id: safeEvent.id,
+      title: safeEvent.title,
+      description: safeEvent.description,
+      startDateTime: startDateTime, // Add this explicitly for sorting
+      date: event.date || eventDate.toLocaleDateString(),
+      time: event.time || eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      location: safeEvent.venue,
+      maxVolunteers: safeEvent.maxParticipants,
+      currentVolunteers: safeEvent.registeredCount,
+      category: safeEvent.category,
+      organizer: {
+        name: event.clubName || (event.club?.name || "Unknown"),
+        logoUrl: event.clubLogo || (event.club?.logoUrl || null)
+      },
+      coverImage: validImageUrl ? eventImage : getDefaultImageUrl(safeEvent.category),
+      // Additional fields from the backend
+      eventRole: event.eventRole || 'attendee',
+      hasAttended: !!event.hasAttended,
+      attendTime: event.attendTime || null,
+      addons: Array.isArray(event.addons) ? event.addons : [],
+      agenda: Array.isArray(event.agenda) ? event.agenda : []
+    };
+  };
+
+  // Function to extract unique categories from events
+  const extractCategories = (eventsArray) => {
+    const eventCategories = eventsArray
+      .map(event => event.category)
+      .filter(Boolean)
+      .reduce((unique, category) => {
+        // Check for case-insensitive duplicates
+        const categoryLower = category.toLowerCase();
+        if (!unique.some(cat => cat.toLowerCase() === categoryLower)) {
+          unique.push(category);
+        }
+        return unique;
+      }, [])
+      .sort();
+
+    return ['All', ...eventCategories];
+  };
+
+  // Function to fetch all events for the Explore tab
+  const fetchExploreEvents = async (showLoading = true) => {
+    try {
+      if (showLoading) {
+        setLoading(true);
+      }
+      setError(null);
+      console.log('Fetching events for Explore tab...');
+      
       const url = `${eventsService._baseUrl}/api/events/all`;
       const response = await fetch(url);
 
@@ -242,140 +420,329 @@ export default function EventsScreen() {
 
       const data = await response.json();
       const fetchedEvents = data?.events || data?.data || data || [];
-      const loadTime = Date.now() - startTime;
-
-      console.log(`API returned ${fetchedEvents ? fetchedEvents.length : 0} events in ${loadTime}ms from ${url}`);
 
       if (fetchedEvents && fetchedEvents.length > 0) {
-        // Simple data normalization to ensure we have consistent field names
-        const normalizedEvents = fetchedEvents.map(event => {
-          // Validate image URLs to make sure they're not empty strings or invalid URLs
-          const eventImage = event.coverImage || event.image;
-          const validImageUrl = eventImage &&
-            typeof eventImage === 'string' &&
-            eventImage.trim().length > 0 &&
-            (eventImage.startsWith('http://') || eventImage.startsWith('https://'));
-
-          // Helper function to get default image URL from category
-          const getDefaultImageUrl = (category) => {
-            const baseCategories = {
-              'environment': 'nature',
-              'community service': 'volunteer',
-              'education': 'education',
-              'animal welfare': 'animals',
-              'health': 'healthcare'
-            };
-
-            const searchTerm = category && baseCategories[category.toLowerCase()]
-              ? baseCategories[category.toLowerCase()]
-              : 'volunteer';
-
-            return `https://source.unsplash.com/400x200/?${encodeURIComponent(searchTerm)}`;
-          };
-
-          return {
-            id: event.id,
-            title: event.title,
-            description: event.description,
-            date: event.date || new Date(event.startDateTime).toLocaleDateString(),
-            time: event.time || new Date(event.startDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            location: event.location || event.venue,
-            maxVolunteers: event.maxVolunteers || event.maxCapacity || event.maxParticipants,
-            currentVolunteers: event.currentVolunteers || event.registeredCount || 0,
-            category: event.category,
-            organizer: event.organizer || event.club || { name: 'Unknown' },
-            coverImage: validImageUrl ? eventImage : getDefaultImageUrl(event.category) // Use default image URL if original is invalid
-          };
-        });
-
-        setEvents(normalizedEvents);
-
-        // Extract unique categories from fetched events and update categories list
-        const eventCategories = normalizedEvents
-          .map(event => {
-            // Ensure consistent capitalization in the stored category data
-            if (event.category) {
-              // Preserve original category in data but ensure consistent format
-              return event.category;
-            }
-            return null;
-          })
-          .filter(Boolean) // Remove null/undefined categories
-          .reduce((unique, category) => {
-            // Check for case-insensitive duplicates to avoid "Environment" and "environment" as separate filters
-            const categoryLower = category.toLowerCase();
-            if (!unique.some(cat => cat.toLowerCase() === categoryLower)) {
-              unique.push(category);
-            }
-            return unique;
-          }, [])
-          .sort(); // Sort categories alphabetically
-
-        // Update categories with 'All' at the beginning plus unique categories from events
-        if (eventCategories.length > 0) {
-          setCategories(['All', ...eventCategories]);
-          console.log(`Updated categories list with ${eventCategories.length} unique categories`);
-        }
-
-        console.log('Successfully loaded and normalized events from /api/events/all');
+        // Normalize the event data
+        const normalizedEvents = fetchedEvents.map(normalizeEventData);
+        setExploreEvents(normalizedEvents);
+        
+        // Update categories
+        setCategories(extractCategories(normalizedEvents));
+        console.log(`Loaded ${normalizedEvents.length} events for Explore tab`);
       } else {
-        console.warn('API returned empty events array, using mock data as fallback');
-        setEvents(MOCK_EVENTS);
-
-        // Extract unique categories from mock events
-        const mockCategories = MOCK_EVENTS
-          .map(event => event.category)
-          .filter(Boolean)
-          .reduce((unique, category) => {
-            // Check for case-insensitive duplicates
-            const categoryLower = category.toLowerCase();
-            if (!unique.some(cat => cat.toLowerCase() === categoryLower)) {
-              unique.push(category);
-            }
-            return unique;
-          }, [])
-          .sort();
-
-        setCategories(['All', ...mockCategories]);
+        console.warn('API returned empty events array');
+        setExploreEvents([]);
       }
     } catch (err) {
-      console.error('Error fetching events:', err);
-      setError(err.message || 'Failed to load events');
+      console.error('Error fetching explore events:', err);
+      
+      // Provide a user-friendly error message based on the error
+      if (err.message.includes('Network request failed')) {
+        setError('Network connection error. Please check your internet connection.');
+      } else if (err.message.includes('timeout')) {
+        setError('Request timed out. Please try again later.');
+      } else {
+        setError('Unable to load events. Please try again later.');
+      }
+      
+      setExploreEvents([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+  
+  // Helper function to fall back to local storage for registered events
+  const fallbackToLocalEvents = async (userId) => {
+    try {
+      const allEventsResponse = await fetch(`${eventsService._baseUrl}/api/events/all`);
+      if (!allEventsResponse.ok) {
+        throw new Error('Failed to load your registered events');
+      }
+      
+      const allEventsData = await allEventsResponse.json();
+      const allEvents = allEventsData?.events || allEventsData?.data || allEventsData || [];
+      const normalizedAllEvents = allEvents.map(normalizeEventData);
+      
+      // Get registrations from AsyncStorage
+      const registrationsData = await AsyncStorage.getItem('eventRegistrations');
+      if (registrationsData) {
+        const registrations = JSON.parse(registrationsData);
+        // Filter events to find ones user has registered for
+        const userRegisteredEvents = normalizedAllEvents.filter(event => 
+          registrations.some(reg => reg.eventId === event.id && reg.userId === userId)
+        );
+        setYourEvents(userRegisteredEvents);
+        console.log(`Found ${userRegisteredEvents.length} registered events from local storage`);
+      } else {
+        setYourEvents([]);
+      }
+    } catch (error) {
+      console.error('Error in fallback method:', error);
+      setError('Unable to load your events');
+      setYourEvents([]);
+    }
+  };
 
-      // Use mock events as fallback
-      console.log('Using mock events as fallback due to API error');
-      setEvents(MOCK_EVENTS);
-
-      // Show error alert
-      Alert.alert(
-        'Error Loading Events',
-        `Using local data instead.\n\nReason: ${err.message}`,
-        [{ text: 'OK' }]
-      );
+  // Function to fetch user's registered events
+  const fetchYourEvents = async (showLoading = true) => {
+    try {
+      if (showLoading) {
+        setLoading(true);
+      }
+      setError(null);
+      
+      // Get user ID
+      const currentUserId = await getUserId();
+      
+      // If we couldn't get a user ID, we'll show an empty state but not throw an error
+      if (!currentUserId) {
+        console.warn('No user ID available for fetching registered events');
+        setYourEvents([]);
+        return;
+      }
+      
+      console.log('Fetching registered events for user...');
+      
+      // Call the API endpoint for registered events
+      // The backend will extract the user ID from the JWT token
+      const baseUrl = eventsService._baseUrl || '';
+      console.log('API Base URL:', baseUrl);
+      
+      const url = `${baseUrl}/api/events/registered`;
+      console.log('Fetching from URL:', url);
+      
+      let token = await AsyncStorage.getItem('token');
+      
+      if (!token) {
+        // Check if we're in development mode
+        if (__DEV__) {
+          // For development purposes only, create a dummy token
+          token = 'demo-token-' + Date.now().toString();
+          await AsyncStorage.setItem('token', token);
+          console.log('Created demo token for development testing');
+        } else {
+          // In production, we should require a proper login
+          console.log('No auth token found - user needs to log in');
+          throw new Error('Please log in to view your registered events');
+        }
+      }
+      
+      console.log('Using authorization token:', token.substring(0, 10) + '...');
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const responseText = await response.text();
+        console.error('API call failed:', responseText);
+        
+        // Check for specific backend errors
+        try {
+          const errorData = JSON.parse(responseText);
+          if (errorData.error && errorData.error.includes('Unknown field')) {
+            console.log('Backend schema error detected:', errorData.error);
+            // This is a backend schema error, don't display to the user
+            // Continue with fallback approach
+          } else if (response.status === 401) {
+            throw new Error('Your session has expired. Please log in again.');
+          } else if (response.status === 404) {
+            // No registered events found or endpoint doesn't exist
+            console.log('No registered events found or endpoint not available');
+            setYourEvents([]);
+            return;
+          } else {
+            // Some other error occurred
+            throw new Error(errorData.error || 'Failed to load your registered events');
+          }
+        } catch (parseError) {
+          // If we can't parse the error response, just continue with fallback
+          console.log('Could not parse error response, continuing with fallback');
+        }
+        
+        // Fallback to the AsyncStorage approach if API fails with other errors
+        console.log('Falling back to AsyncStorage approach');
+        await fallbackToLocalEvents(currentUserId);
+      } else {
+        // Process API response if successful
+        const responseText = await response.text();
+        console.log('API Response:', responseText);
+        
+        try {
+          const data = JSON.parse(responseText);
+          console.log('Parsed data:', data);
+          
+          // Check if there's an error in the response even though status was 200
+          if (data.error) {
+            console.error('API returned error:', data.error);
+            throw new Error(data.error);
+          }
+          
+          const registeredEvents = data?.events || [];
+          
+          if (registeredEvents.length === 0) {
+            console.log('No registered events found for this user');
+            setYourEvents([]);
+          } else {
+            const normalizedEvents = registeredEvents.map(normalizeEventData);
+            setYourEvents(normalizedEvents);
+            console.log(`Loaded ${normalizedEvents.length} registered events from API`);
+          }
+        } catch (parseError) {
+          console.error('Error parsing API response:', parseError);
+          
+          // If we can't parse the response or there's an error in the response
+          // Fall back to the AsyncStorage approach
+          console.log('Falling back to AsyncStorage approach due to parse error');
+          await fallbackToLocalEvents(currentUserId);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching registered events:', err);
+      // Use a more user-friendly error message
+      if (err.message.includes('log in')) {
+        setError('You need to be logged in to view your events');
+      } else if (err.message.includes('token')) {
+        setError('Your session has expired. Please log in again');
+      } else {
+        setError('Unable to load your events. Please try again later');
+      }
+      setYourEvents([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  // Fetch events when component mounts
+  // Track if we've already loaded each tab's data
+  const [dataLoaded, setDataLoaded] = useState({
+    explore: false,
+    your: false
+  });
+
+  // Fetch both tabs' data on initial load
   useEffect(() => {
-    fetchEvents();
+    const loadInitialData = async () => {
+      // Load both datasets on first render to make tab switching fast
+      await fetchExploreEvents(false);
+      await fetchYourEvents(false);
+      
+      // Mark both as loaded
+      setDataLoaded({
+        explore: true,
+        your: true
+      });
+    };
+    
+    loadInitialData();
   }, []);
+  
+  // Handle tab changes - avoid full reloading if data was already loaded once
+  useEffect(() => {
+    if (activeTab === 'explore' && !dataLoaded.explore) {
+      fetchExploreEvents();
+    } else if (activeTab === 'your' && !dataLoaded.your) {
+      fetchYourEvents();
+    }
+  }, [activeTab]);
 
   // Handle pull-to-refresh
   const onRefresh = () => {
     setRefreshing(true);
-    fetchEvents();
+    if (activeTab === 'explore') {
+      fetchExploreEvents(true);
+      setDataLoaded(prev => ({
+        ...prev,
+        explore: true
+      }));
+    } else {
+      fetchYourEvents(true);
+      setDataLoaded(prev => ({
+        ...prev,
+        your: true
+      }));
+    }
   };
-
-  // Filter events based on search query and selected category
-  const filteredEvents = events.filter(event => {
-    const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         event.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || event.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  
+  // Check if user is registered for an event (only used for display purposes now)
+  const isUserRegistered = (eventId) => {
+    // Since we're fetching registered events directly, in the 'your' tab all events are registered
+    if (activeTab === 'your') return true;
+    
+    // For the explore tab, check if the event is in the yourEvents list
+    const isRegistered = yourEvents.some(event => event.id === eventId);
+    return isRegistered;
+  };
+  
+  // Filter events based on search query, selected category, and registration status
+  const getFilteredEvents = () => {
+    // Determine which event list to use based on active tab
+    let eventsToFilter = activeTab === 'explore' ? exploreEvents : yourEvents;
+    
+    // Log the current state of data
+    console.log(`Filtering events - Active tab: ${activeTab}`);
+    console.log(`Events count: ${eventsToFilter.length}`);
+    console.log(`Search query: "${searchQuery}", Selected category: ${selectedCategory}`);
+    
+    // For explore tab, filter out events that user has already registered for
+    if (activeTab === 'explore') {
+      const registeredEventIds = yourEvents.map(event => event.id);
+      eventsToFilter = eventsToFilter.filter(event => !registeredEventIds.includes(event.id));
+      console.log(`Events after removing registered ones: ${eventsToFilter.length}`);
+    }
+    
+    const filtered = eventsToFilter.filter(event => {
+      // Basic filtering for search query and category
+      const matchesSearch = 
+        event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        event.description.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesCategory = selectedCategory === 'All' || event.category === selectedCategory;
+      
+      return matchesSearch && matchesCategory;
+    });
+    
+    // Sort events by showing upcoming events first (closest to today first)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to start of day for fair comparison
+    
+    const sortedEvents = [...filtered].sort((a, b) => {
+      // We now have standardized startDateTime fields for all events
+      const dateA = new Date(a.startDateTime || a.date || 0);
+      const dateB = new Date(b.startDateTime || b.date || 0);
+      
+      // Determine if events are upcoming or past
+      const aIsUpcoming = dateA >= today;
+      const bIsUpcoming = dateB >= today;
+      
+      // If both are upcoming or both are past, sort by proximity to today
+      if (aIsUpcoming === bIsUpcoming) {
+        // For upcoming events, earlier date first (ascending)
+        if (aIsUpcoming) {
+          return dateA - dateB;
+        } 
+        // For past events, more recent date first (descending)
+        else {
+          return dateB - dateA;
+        }
+      }
+      
+      // Show upcoming events before past events
+      return aIsUpcoming ? -1 : 1;
+    });
+    
+    console.log(`Filtered and sorted events: ${sortedEvents.length}`);
+    return sortedEvents;
+  };
+  
+  // Get filtered events based on criteria
+  const filteredEvents = getFilteredEvents();
 
   // Function to handle image errors and track which events need fallback images
   const handleImageError = (eventId) => {
@@ -389,20 +756,67 @@ export default function EventsScreen() {
   const handleEventPress = (eventId) => {
     router.push(`/event/${eventId}`);
   };
+  
+  // Function to render content
+  const renderContent = () => {
+    // Loading state for only first data load, handled outside this function now
+    // This keeps the content visible during tab switches
+    
+    return (
+      <View style={styles.eventsList}>
+        <View style={styles.eventsHeader}>
+          <Text style={styles.eventsCount}>
+            {filteredEvents.length} {filteredEvents.length === 1 ? 'Event' : 'Events'} Found
+          </Text>
+          <View style={{flexDirection: 'row', gap: 8}}>
+            <TouchableOpacity style={styles.sortButton}>
+              <Feather name="filter" size={16} color="#6b7280" />
+              <Text style={styles.sortButtonText}>Sort</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {filteredEvents.map((event) => (
+          <EventCard
+            key={event.id}
+            event={{
+              ...event,
+              hasImageError: imageLoadErrors[event.id]
+            }}
+            onPress={() => handleEventPress(event.id)}
+            onImageError={() => handleImageError(event.id)}
+            isRegistered={isUserRegistered(event.id)} // Pass registration status
+          />
+        ))}
+
+        {filteredEvents.length === 0 && (
+          <View style={styles.emptyState}>
+            <Feather name={activeTab === 'explore' ? "calendar" : "user-check"} size={64} color="#fed7aa" />
+            <Text style={styles.emptyStateTitle}>
+              {activeTab === 'explore' ? 'No Events Found' : 'No Registered Events'}
+            </Text>
+            <Text style={styles.emptyStateText}>
+              {activeTab === 'explore' 
+                ? searchQuery || selectedCategory !== 'All' 
+                  ? 'Try adjusting your search or filter criteria'
+                  : yourEvents.length > 0 
+                    ? 'You\'ve registered for all available events!'
+                    : 'No available events at the moment'
+                : 'You haven\'t registered for any events yet. Register for events to see them here.'
+              }
+            </Text>
+            
+            {/* Explore tab refresh button removed */}
+            
+            {/* Buttons removed as requested */}
+          </View>
+        )}
+      </View>
+    );
+  };
 
   return (
-    <ScrollView
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.mainScrollContent}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          colors={['#f97316']}
-        />
-      }
-    >
+    <View style={styles.container}>
       {/* Header Section */}
       <LinearGradient
         colors={['#f97316', '#ef4444']}
@@ -411,15 +825,20 @@ export default function EventsScreen() {
         end={{ x: 1, y: 1 }}
       >
         <View style={styles.headerContent}>
-          <Feather name="calendar" size={32} color="#ffffff" />
-          <Text style={styles.headerTitle}>Upcoming Events</Text>
+          <Feather name={activeTab === 'explore' ? "calendar" : "user-check"} size={32} color="#ffffff" />
+          <Text style={styles.headerTitle}>
+            {activeTab === 'explore' ? 'Available Events' : 'Your Events'}
+          </Text>
           <Text style={styles.headerSubtitle}>
-            Find volunteering opportunities and make a difference in your community
+            {activeTab === 'explore' 
+              ? 'Discover new volunteering opportunities you haven\'t registered for yet' 
+              : 'View and manage events you\'ve registered for'
+            }
           </Text>
           {/* Refresh button */}
           <TouchableOpacity
             style={styles.refreshButton}
-            onPress={fetchEvents}
+            onPress={onRefresh}
             disabled={loading}
           >
             <Feather
@@ -429,6 +848,22 @@ export default function EventsScreen() {
               style={loading ? { opacity: 0.6 } : {}}
             />
           </TouchableOpacity>
+          
+          {/* Tab buttons */}
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'explore' && styles.activeTab]}
+              onPress={() => setActiveTab('explore')}
+            >
+              <Text style={[styles.tabText, activeTab === 'explore' && styles.activeTabText]}>Explore</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'your' && styles.activeTab]}
+              onPress={() => setActiveTab('your')}
+            >
+              <Text style={[styles.tabText, activeTab === 'your' && styles.activeTabText]}>Your Events</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </LinearGradient>
 
@@ -470,77 +905,48 @@ export default function EventsScreen() {
         </ScrollView>
       </View>
 
-      {/* Events List */}
-      <View style={styles.eventsList}>
-        <View style={styles.eventsHeader}>
-          <Text style={styles.eventsCount}>
-            {filteredEvents.length} {filteredEvents.length === 1 ? 'Event' : 'Events'} Found
-          </Text>
-          <View style={{flexDirection: 'row', gap: 8}}>
-            {__DEV__ && (
+      {/* Main Content */}
+      <ScrollView 
+        style={styles.mainContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#f97316']} />
+        }
+      >
+        {/* Error state */}
+        {activeTab === 'your' && error ? (
+          <View style={styles.errorContainer}>
+            <Feather name="alert-circle" size={48} color="#fed7aa" />
+            <Text style={styles.errorTitle}>Something went wrong</Text>
+            <Text style={styles.errorText}>{error}</Text>
+            {error.toLowerCase().includes('log in') && (
               <TouchableOpacity
-                onPress={() => {
-                  Alert.alert(
-                    "API Debug Info",
-                    `API URL: ${eventsService._baseUrl}\n` +
-                    `Endpoint: /api/events/all (direct fetch)\n` +
-                    `Events: ${events.length}\n` +
-                    `Source: ${events === MOCK_EVENTS ? "MOCK DATA" : "API DIRECT"}\n` +
-                    `Error: ${error || "None"}`
-                  );
-                }}
-                style={styles.debugButton}
+                style={styles.loginButton}
+                onPress={() => router.push('/(auth)/login')}
               >
-                <Feather name="info" size={16} color="#0369a1" />
+                <Text style={styles.loginButtonText}>Log In</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.sortButton}>
-              <Feather name="filter" size={16} color="#6b7280" />
-              <Text style={styles.sortButtonText}>Sort</Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={onRefresh}
+            >
+              <Text style={styles.retryButtonText}>Try Again</Text>
             </TouchableOpacity>
-          </View>
-        </View>
-
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#f97316" />
-            <Text style={styles.loadingText}>Loading events...</Text>
           </View>
         ) : (
           <>
-            {filteredEvents.map((event) => (
-              <EventCard
-                key={event.id}
-                event={{
-                  ...event,
-                  hasImageError: imageLoadErrors[event.id]
-                }}
-                onPress={() => handleEventPress(event.id)}
-                onImageError={() => handleImageError(event.id)}
-              />
-            ))}
-
-            {filteredEvents.length === 0 && !loading && (
-              <View style={styles.emptyState}>
-                <Feather name="calendar" size={64} color="#fed7aa" />
-                <Text style={styles.emptyStateTitle}>No Events Found</Text>
-                <Text style={styles.emptyStateText}>
-                  {error ? 'Unable to load events from server. Try again later.' : 'Try adjusting your search or filter criteria'}
-                </Text>
-                {error && (
-                  <TouchableOpacity
-                    style={styles.retryButton}
-                    onPress={fetchEvents}
-                  >
-                    <Text style={styles.retryButtonText}>Retry</Text>
-                  </TouchableOpacity>
-                )}
+            {/* Only show loading indicator on first data load */}
+            {loading && !dataLoaded[activeTab] ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#f97316" />
+                <Text style={styles.loadingText}>Loading events...</Text>
               </View>
-            )}
+            ) : renderContent()}
           </>
         )}
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -549,16 +955,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff7ed',
   },
-
-  mainScrollContent: {
-    paddingBottom: 140, // Extra space for floating tabs
+  mainContent: {
+    flex: 1,
+    backgroundColor: '#fff7ed',
   },
 
   // Header Styles
   headerGradient: {
     paddingHorizontal: 24,
     paddingTop: 24,
-    paddingBottom: 32,
+    paddingBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -592,6 +998,38 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
     paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  
+  // Tab Styles
+  tabContainer: { 
+    flexDirection: 'row', 
+    backgroundColor: 'rgba(255, 255, 255, 0.2)', 
+    borderRadius: 12, 
+    padding: 4, 
+    width: '100%', 
+    maxWidth: 320,
+    marginTop: 10,
+  },
+  tab: { 
+    flex: 1, 
+    paddingVertical: 10, 
+    paddingHorizontal: 16, 
+    borderRadius: 8, 
+    alignItems: 'center' 
+  },
+  activeTab: { 
+    backgroundColor: '#ffffff' 
+  },
+  tabText: { 
+    fontSize: 14, 
+    fontWeight: '600', 
+    color: '#ffffff', 
+    opacity: 0.8 
+  },
+  activeTabText: { 
+    color: '#f97316', 
+    opacity: 1 
   },
 
   // Loading and Error States
@@ -613,6 +1051,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 80,
     paddingHorizontal: 32,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    marginHorizontal: 16,
+    marginVertical: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   errorTitle: {
     fontSize: 20,
@@ -628,6 +1075,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 24,
+  },
+  loginButton: {
+    backgroundColor: '#f97316',
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    marginBottom: 16,
+    shadowColor: '#f97316',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  loginButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   retryButton: {
     backgroundColor: '#f97316',
@@ -798,6 +1262,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
   },
+  registeredBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  registeredText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
 
   // Event Content Styles
   eventContent: {
@@ -892,6 +1376,15 @@ const styles = StyleSheet.create({
   applyButtonTextDisabled: {
     color: '#9ca3af',
   },
+  registeredButton: {
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#10b981',
+    shadowColor: '#10b981',
+  },
+  registeredButtonText: {
+    color: '#10b981',
+  },
 
   // Empty State Styles
   emptyState: {
@@ -912,43 +1405,9 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     textAlign: 'center',
     lineHeight: 24,
+    marginBottom: 20,
   },
+  /* buttonGroup style removed */
 
-  // Loading Styles
-  loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 64,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#6b7280',
-  },
-
-  // Error and Retry Styles
-  retryButton: {
-    marginTop: 16,
-    backgroundColor: '#f97316',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#ffffff',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-
-  // Debug button
-  debugButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f0f9ff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#e0f2fe',
-  },
+  // End of styles
 });
