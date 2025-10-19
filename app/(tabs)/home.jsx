@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Link } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { netconfig } from '../../netconfig';
+import { useOrganizer } from '../../context/OrganizerContext';
 
 const { width } = Dimensions.get('window');
 
@@ -14,6 +15,7 @@ export default function HomeScreen() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [clubsData, setClubsData] = useState([]);
+    const { isOrganizer, loading: organizerLoading, checkStatus } = useOrganizer();
     const router = useRouter();
 
     useEffect(() => {
@@ -27,6 +29,9 @@ export default function HomeScreen() {
                 console.error('Error fetching user data:', error);
             }
             fetchClubs();
+            // The organizer status is automatically checked by the OrganizerProvider
+            // We can optionally refresh it here
+            checkStatus();
         };
         fetchInitialData();
     }, []);
@@ -89,7 +94,37 @@ export default function HomeScreen() {
                             <View style={styles.quickActionsGrid}>
                                 <Link href="/(tabs)/events" asChild><TouchableOpacity style={styles.quickActionCard}><LinearGradient colors={['#3b82f6', '#1d4ed8']} style={styles.quickActionIcon}><Feather name="calendar" size={20} color="#ffffff" /></LinearGradient><Text style={styles.quickActionTitle}>Browse Events</Text><Text style={styles.quickActionSubtitle}>Discover opportunities</Text></TouchableOpacity></Link>
                                 <Link href="/(tabs)/clubs" asChild><TouchableOpacity style={styles.quickActionCard}><LinearGradient colors={['#8b5cf6', '#7c3aed']} style={styles.quickActionIcon}><Feather name="users" size={20} color="#ffffff" /></LinearGradient><Text style={styles.quickActionTitle}>Find Clubs</Text><Text style={styles.quickActionSubtitle}>Connect with peers</Text></TouchableOpacity></Link>
-                                <Link href="/(tabs)/wallet" asChild><TouchableOpacity style={styles.quickActionCard}><LinearGradient colors={['#10b981', '#059669']} style={styles.quickActionIcon}><Feather name="award" size={20} color="#ffffff" /></LinearGradient><Text style={styles.quickActionTitle}>Certificates</Text><Text style={styles.quickActionSubtitle}>View achievements</Text></TouchableOpacity></Link>
+                                
+                                {organizerLoading ? (
+                                    <TouchableOpacity style={styles.quickActionCard} disabled={true}>
+                                        <View style={styles.loadingIconContainer}>
+                                            <ActivityIndicator size="small" color="#f97316" />
+                                        </View>
+                                        <Text style={styles.quickActionTitle}>Loading...</Text>
+                                        <Text style={styles.quickActionSubtitle}>Please wait</Text>
+                                    </TouchableOpacity>
+                                ) : isOrganizer ? (
+                                    <Link href="/organizer/dashboard" asChild>
+                                        <TouchableOpacity style={styles.quickActionCard}>
+                                            <LinearGradient colors={['#ef4444', '#dc2626']} style={styles.quickActionIcon}>
+                                                <Feather name="clipboard" size={20} color="#ffffff" />
+                                            </LinearGradient>
+                                            <Text style={styles.quickActionTitle}>Organizer</Text>
+                                            <Text style={styles.quickActionSubtitle}>Manage events</Text>
+                                        </TouchableOpacity>
+                                    </Link>
+                                ) : (
+                                    <Link href="/(tabs)/wallet" asChild>
+                                        <TouchableOpacity style={styles.quickActionCard}>
+                                            <LinearGradient colors={['#10b981', '#059669']} style={styles.quickActionIcon}>
+                                                <Feather name="award" size={20} color="#ffffff" />
+                                            </LinearGradient>
+                                            <Text style={styles.quickActionTitle}>Certificates</Text>
+                                            <Text style={styles.quickActionSubtitle}>View achievements</Text>
+                                        </TouchableOpacity>
+                                    </Link>
+                                )}
+                                
                                 <Link href="/election" asChild><TouchableOpacity style={styles.quickActionCard}><LinearGradient colors={['#f59e0b', '#d97706']} style={styles.quickActionIcon}><Feather name="check-square" size={20} color="#ffffff" /></LinearGradient><Text style={styles.quickActionTitle}>Elections</Text><Text style={styles.quickActionSubtitle}>Cast your vote</Text></TouchableOpacity></Link>
                             </View>
                         </View>
@@ -146,6 +181,7 @@ const styles = StyleSheet.create({
     quickActionsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12 },
     quickActionCard: { width: (width - 72) / 2, backgroundColor: '#ffffff', borderRadius: 20, padding: 20, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 8 },
     quickActionIcon: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+    loadingIconContainer: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginBottom: 12, backgroundColor: '#f3f4f6' },
     quickActionTitle: { fontSize: 16, fontWeight: '700', color: '#000000', textAlign: 'center', marginBottom: 4 },
     quickActionSubtitle: { fontSize: 12, color: '#6b7280', textAlign: 'center', fontWeight: '500' },
     sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
