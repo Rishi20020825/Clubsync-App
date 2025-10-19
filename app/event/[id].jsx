@@ -224,6 +224,94 @@ const MOCK_EVENTS = [
   }
 ];
 
+// Helper function to safely format event date
+const getFormattedDate = (event) => {
+  try {
+    // First try to use the pre-formatted date string if it exists
+    if (event.date && typeof event.date === 'string' && !event.date.includes('Invalid')) {
+      return event.date;
+    }
+    
+    // If no pre-formatted date, try to parse from various date fields
+    let dateObj;
+    if (event.startDateTime && !isNaN(new Date(event.startDateTime).getTime())) {
+      dateObj = new Date(event.startDateTime);
+    } else if (event.startDate && !isNaN(new Date(event.startDate).getTime())) {
+      dateObj = new Date(event.startDate);
+    } else if (event.date && !isNaN(new Date(event.date).getTime())) {
+      dateObj = new Date(event.date);
+    } else {
+      return "Date not available";
+    }
+    
+    // Format the date
+    return dateObj.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return "Date not available";
+  }
+};
+
+// Helper function to safely format event time
+const getFormattedTime = (event) => {
+  try {
+    // First try to use the pre-formatted time string if it exists
+    if (event.time && typeof event.time === 'string' && !event.time.includes('Invalid')) {
+      return event.time;
+    }
+    
+    // Log values for debugging
+    console.log('Time formatting - available fields:', {
+      startDateTime: event.startDateTime,
+      startDate: event.startDate, 
+      date: event.date,
+      time: event.time
+    });
+    
+    // If no pre-formatted time, try to parse from various date fields
+    let dateObj;
+    if (event.startDateTime && !isNaN(new Date(event.startDateTime).getTime())) {
+      dateObj = new Date(event.startDateTime);
+      console.log('Using startDateTime:', event.startDateTime);
+    } else if (event.startDate && !isNaN(new Date(event.startDate).getTime())) {
+      dateObj = new Date(event.startDate);
+      console.log('Using startDate:', event.startDate);
+    } else if (event.date && !isNaN(new Date(event.date).getTime())) {
+      dateObj = new Date(event.date);
+      console.log('Using date:', event.date);
+    } 
+    
+    // If we couldn't parse a date, try once more with the direct time field
+    if (!dateObj || isNaN(dateObj.getTime())) {
+      if (event.time) {
+        // Just return the time string directly if it exists
+        return event.time;
+      }
+      return "Time not specified";
+    }
+    
+    // Format the time
+    const formattedTime = dateObj.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    
+    console.log('Formatted time result:', formattedTime);
+    return formattedTime;
+  } catch (error) {
+    console.error('Error formatting time:', error);
+    if (event.time) {
+      // Fallback to just showing the time string as is
+      return event.time;
+    }
+    return "Time not specified";
+  }
+};
+
 const getCategoryColor = (category) => {
   const colors = {
     'Environment': '#10b981',
@@ -332,6 +420,42 @@ export default function EventDetailsScreen() {
       if (eventData) {
         // Normalize the event data for consistent handling
         const normalizedEvent = normalizeEventData(eventData);
+        
+        // Ensure date and time fields are properly formatted
+        if (!normalizedEvent.date || normalizedEvent.date === "Invalid Date") {
+          if (normalizedEvent.startDateTime) {
+            try {
+              const dateObj = new Date(normalizedEvent.startDateTime);
+              if (!isNaN(dateObj.getTime())) {
+                normalizedEvent.date = dateObj.toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                });
+                normalizedEvent.time = dateObj.toLocaleTimeString('en-US', {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                });
+              }
+            } catch (e) {
+              console.error('Error parsing date:', e);
+            }
+          }
+        }
+        
+        // Make sure we preserve the time from the original data if available
+        if (eventData.time && (!normalizedEvent.time || normalizedEvent.time === "Invalid Date")) {
+          normalizedEvent.time = eventData.time;
+          console.log('Using original time value:', eventData.time);
+        }
+        
+        // Special handling for organizer field which might be a string or object
+        if (typeof normalizedEvent.organizer === 'string') {
+          normalizedEvent.organizer = { name: normalizedEvent.organizer };
+        } else if (!normalizedEvent.organizer) {
+          normalizedEvent.organizer = { name: "Unknown" };
+        }
+        
         console.log(`Successfully retrieved event data from ${successfulEndpoint} endpoint`);
         console.log('Normalized event data:', normalizedEvent);
         setEvent(normalizedEvent);
@@ -684,7 +808,9 @@ export default function EventDetailsScreen() {
               </Text>
             </LinearGradient>
             <Text style={styles.eventTitle}>{event.title}</Text>
-            <Text style={styles.organizer}>Organized by {event.organizer}</Text>
+            <Text style={styles.organizer}>
+              Organized by {event.organizer?.name || event.organizer || (event.club?.name || "Unknown")}
+            </Text>
           </View>
         </View>
 
@@ -696,9 +822,11 @@ export default function EventDetailsScreen() {
             </View>
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Date & Time</Text>
-              <Text style={styles.infoValue}>{event.date || new Date(event.startDateTime || event.startDate || event.date).toLocaleDateString()}</Text>
+              <Text style={styles.infoValue}>
+                {getFormattedDate(event)}
+              </Text>
               <Text style={styles.infoSubValue}>
-                {event.time || new Date(event.startDateTime || event.startDate || event.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {getFormattedTime(event)}
                 {event.duration && ` (${event.duration})`}
               </Text>
             </View>

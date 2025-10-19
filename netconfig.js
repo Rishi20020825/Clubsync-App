@@ -1,7 +1,7 @@
 export const netconfig = {
     // Main API URL - Change this to match your server
     // API_BASE_URL: 'http://10.28.82.62:3000', // Change this when your network changes(otiginal)
-    API_BASE_URL: 'http://10.37.192.228:3000', // Change this when your network changes(rashmika  )
+    API_BASE_URL: 'http://10.28.82.62:3000', // Change this when your network changes(rashmika  )
     
     // Alternative URLs - Uncomment the one that works for your setup
     // API_BASE_URL: 'http://10.0.2.2:3000', // Android emulator accessing localhost
