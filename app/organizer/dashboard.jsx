@@ -4,6 +4,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { netconfig } from '../../netconfig'; // adjust the path if needed
 import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 export default function OrganizerDashboard() {
   const [events, setEvents] = useState([]);
   const router = useRouter();
@@ -125,88 +128,376 @@ export default function OrganizerDashboard() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <Text style={styles.heading}>Your Events</Text>
-        <View style={styles.buttonGroup}>
-          <TouchableOpacity 
-            style={styles.backBtn} 
-            onPress={() => router.back()}
-          >
-            <Text style={styles.backBtnText}>Back</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.signOutBtn} 
-            onPress={handleSignOut}
-          >
-            <Text style={styles.signOutText}>Sign Out</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+    <SafeAreaView style={styles.safeArea}>
+      <LinearGradient colors={['#fff7ed', '#fef2f2', '#fff']} style={styles.gradient}>
+        <View style={styles.container}>
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={styles.headerLeft}>
+              <LinearGradient colors={['#f97316', '#ef4444']} style={styles.headerIcon}>
+                <Feather name="clipboard" size={24} color="#ffffff" />
+              </LinearGradient>
+              <View>
+                <Text style={styles.headerTitle}>Organizer</Text>
+                <Text style={styles.headerSubtitle}>Manage Your Events</Text>
+              </View>
+            </View>
+            <View style={styles.headerButtons}>
+              <TouchableOpacity 
+                style={styles.iconButton} 
+                onPress={() => router.back()}
+              >
+                <Feather name="arrow-left" size={20} color="#f97316" />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.iconButtonDanger} 
+                onPress={handleSignOut}
+              >
+                <Feather name="log-out" size={20} color="#ef4444" />
+              </TouchableOpacity>
+            </View>
+          </View>
 
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#f97316" />
-          <Text style={styles.loadingText}>Loading your events...</Text>
-        </View>
-      ) : events.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No events found</Text>
-          <Text style={styles.emptySubText}>You are not an organizer for any events yet</Text>
-          <TouchableOpacity 
-            style={styles.refreshButton}
-            onPress={onRefresh}
-          >
-            <Text style={styles.refreshButtonText}>Refresh</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <FlatList
-          data={events}
-          keyExtractor={item => item.id ? item.id.toString() : Math.random().toString()}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.eventCard}
-              onPress={() => {
-                console.log('Clicked Event ID:', item.id);
-                router.push(`/organizer/event/${item.id}`);
-              }}
-            >
-              <Text style={styles.eventTitle}>{item.title}</Text>
-              {item.date && <Text style={styles.eventDate}>{item.date}</Text>}
-              {item.location && <Text style={styles.eventLocation}>{item.location}</Text>}
-            </TouchableOpacity>
+          {/* Stats Cards */}
+          <View style={styles.statsContainer}>
+            <LinearGradient colors={['#f97316', '#ef4444']} style={styles.statCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+              <Feather name="calendar" size={24} color="#ffffff" />
+              <Text style={styles.statNumber}>{events.length}</Text>
+              <Text style={styles.statLabel}>Total Events</Text>
+            </LinearGradient>
+            <View style={styles.statCardWhite}>
+              <LinearGradient colors={['#3b82f6', '#1d4ed8']} style={styles.statIconContainer}>
+                <Feather name="clock" size={20} color="#ffffff" />
+              </LinearGradient>
+              <Text style={styles.statNumberDark}>
+                {events.filter(e => new Date(e.date) > new Date()).length}
+              </Text>
+              <Text style={styles.statLabelDark}>Upcoming</Text>
+            </View>
+          </View>
+
+          {/* Events List */}
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#f97316" />
+              <Text style={styles.loadingText}>Loading your events...</Text>
+            </View>
+          ) : events.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <LinearGradient colors={['#f97316', '#ef4444']} style={styles.emptyIcon}>
+                <Feather name="calendar" size={48} color="#ffffff" />
+              </LinearGradient>
+              <Text style={styles.emptyText}>No Events Yet</Text>
+              <Text style={styles.emptySubText}>You are not an organizer for any events yet</Text>
+              <TouchableOpacity 
+                style={styles.refreshButtonContainer}
+                onPress={onRefresh}
+              >
+                <LinearGradient colors={['#f97316', '#ef4444']} style={styles.refreshButton}>
+                  <Feather name="refresh-cw" size={18} color="#ffffff" />
+                  <Text style={styles.refreshButtonText}>Refresh</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.eventsSection}>
+              <Text style={styles.sectionTitle}>Your Events</Text>
+              <FlatList
+                data={events}
+                keyExtractor={item => item.id ? item.id.toString() : Math.random().toString()}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.eventCard}
+                    onPress={() => {
+                      console.log('Clicked Event ID:', item.id);
+                      router.push(`/organizer/event/${item.id}`);
+                    }}
+                  >
+                    <LinearGradient colors={['#f97316', '#ef4444']} style={styles.eventCardIcon}>
+                      <Feather name="calendar" size={20} color="#ffffff" />
+                    </LinearGradient>
+                    <View style={styles.eventCardContent}>
+                      <Text style={styles.eventTitle}>{item.title}</Text>
+                      {item.date && (
+                        <View style={styles.eventMetaRow}>
+                          <Feather name="clock" size={14} color="#6b7280" />
+                          <Text style={styles.eventDate}>{item.date}</Text>
+                        </View>
+                      )}
+                      {item.location && (
+                        <View style={styles.eventMetaRow}>
+                          <Feather name="map-pin" size={14} color="#6b7280" />
+                          <Text style={styles.eventLocation}>{item.location}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Feather name="chevron-right" size={24} color="#f97316" />
+                  </TouchableOpacity>
+                )}
+                refreshing={refreshing}   
+                onRefresh={onRefresh}
+                initialNumToRender={5}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                ListFooterComponent={<View style={{ height: 20 }} />}
+                showsVerticalScrollIndicator={false}
+              />
+            </View>
           )}
-          refreshing={refreshing}   
-          onRefresh={onRefresh}
-          initialNumToRender={5} // Optimize initial render
-          maxToRenderPerBatch={10} // Batch rendering for better performance
-          windowSize={5} // Controls how many items are rendered outside the viewport
-          ListFooterComponent={<View style={{ height: 20 }} />}
-        />
-      )}
-    </View>
+        </View>
+      </LinearGradient>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#fff' },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  heading: { fontSize: 24, fontWeight: 'bold' },
-  buttonGroup: { flexDirection: 'row', gap: 8 },
-  backBtn: { backgroundColor: '#3b82f6', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8 },
-  backBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  signOutBtn: { backgroundColor: '#ef4444', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8 },
-  signOutText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  eventCard: { padding: 16, backgroundColor: '#f3f4f6', borderRadius: 12, marginBottom: 12 },
-  eventTitle: { fontSize: 18, fontWeight: '600', marginBottom: 4 },
-  eventDate: { fontSize: 14, color: '#4b5563', marginBottom: 2 },
-  eventLocation: { fontSize: 14, color: '#4b5563', fontStyle: 'italic' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 12, fontSize: 16, color: '#4b5563' },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  emptyText: { fontSize: 20, fontWeight: '600', marginBottom: 8, textAlign: 'center' },
-  emptySubText: { fontSize: 16, color: '#4b5563', marginBottom: 24, textAlign: 'center' },
-  refreshButton: { backgroundColor: '#f97316', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 8 },
-  refreshButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  safeArea: { 
+    flex: 1, 
+    backgroundColor: '#fff7ed' 
+  },
+  gradient: { 
+    flex: 1 
+  },
+  container: { 
+    flex: 1, 
+    paddingHorizontal: 20 
+  },
+  header: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingVertical: 20,
+    paddingHorizontal: 4
+  },
+  headerLeft: { 
+    flexDirection: 'row', 
+    alignItems: 'center',
+    gap: 12
+  },
+  headerIcon: { 
+    width: 48, 
+    height: 48, 
+    borderRadius: 24, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    shadowColor: '#f97316',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6
+  },
+  headerTitle: { 
+    fontSize: 24, 
+    fontWeight: '800', 
+    color: '#000000' 
+  },
+  headerSubtitle: { 
+    fontSize: 14, 
+    color: '#6b7280', 
+    fontWeight: '500' 
+  },
+  headerButtons: { 
+    flexDirection: 'row', 
+    gap: 8 
+  },
+  iconButton: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    backgroundColor: '#fff7ed', 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#fed7aa'
+  },
+  iconButtonDanger: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    backgroundColor: '#fef2f2', 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#fecaca'
+  },
+  statsContainer: { 
+    flexDirection: 'row', 
+    gap: 12, 
+    marginBottom: 24 
+  },
+  statCard: { 
+    flex: 1, 
+    borderRadius: 20, 
+    padding: 20, 
+    alignItems: 'center',
+    shadowColor: '#f97316',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8
+  },
+  statCardWhite: { 
+    flex: 1, 
+    backgroundColor: '#ffffff', 
+    borderRadius: 20, 
+    padding: 20, 
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8
+  },
+  statIconContainer: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    marginBottom: 8
+  },
+  statNumber: { 
+    fontSize: 32, 
+    fontWeight: '800', 
+    color: '#ffffff', 
+    marginTop: 8, 
+    marginBottom: 4 
+  },
+  statLabel: { 
+    fontSize: 12, 
+    color: 'rgba(255, 255, 255, 0.9)', 
+    fontWeight: '600' 
+  },
+  statNumberDark: { 
+    fontSize: 32, 
+    fontWeight: '800', 
+    color: '#000000', 
+    marginTop: 8, 
+    marginBottom: 4 
+  },
+  statLabelDark: { 
+    fontSize: 12, 
+    color: '#6b7280', 
+    fontWeight: '600' 
+  },
+  eventsSection: { 
+    flex: 1 
+  },
+  sectionTitle: { 
+    fontSize: 20, 
+    fontWeight: '700', 
+    color: '#000000', 
+    marginBottom: 16 
+  },
+  eventCard: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff', 
+    borderRadius: 16, 
+    padding: 16, 
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4
+  },
+  eventCardIcon: { 
+    width: 48, 
+    height: 48, 
+    borderRadius: 24, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    marginRight: 12
+  },
+  eventCardContent: { 
+    flex: 1 
+  },
+  eventTitle: { 
+    fontSize: 16, 
+    fontWeight: '700', 
+    color: '#000000', 
+    marginBottom: 6 
+  },
+  eventMetaRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 6, 
+    marginBottom: 4 
+  },
+  eventDate: { 
+    fontSize: 14, 
+    color: '#6b7280', 
+    fontWeight: '500' 
+  },
+  eventLocation: { 
+    fontSize: 14, 
+    color: '#6b7280', 
+    fontWeight: '500' 
+  },
+  loadingContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  loadingText: { 
+    marginTop: 12, 
+    fontSize: 16, 
+    color: '#6b7280',
+    fontWeight: '500'
+  },
+  emptyContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    padding: 20 
+  },
+  emptyIcon: { 
+    width: 96, 
+    height: 96, 
+    borderRadius: 48, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    marginBottom: 24,
+    shadowColor: '#f97316',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8
+  },
+  emptyText: { 
+    fontSize: 24, 
+    fontWeight: '700', 
+    marginBottom: 8, 
+    textAlign: 'center',
+    color: '#000000'
+  },
+  emptySubText: { 
+    fontSize: 16, 
+    color: '#6b7280', 
+    marginBottom: 24, 
+    textAlign: 'center',
+    fontWeight: '500'
+  },
+  refreshButtonContainer: { 
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#f97316',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6
+  },
+  refreshButton: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 14, 
+    paddingHorizontal: 28
+  },
+  refreshButtonText: { 
+    color: '#ffffff', 
+    fontWeight: '700', 
+    fontSize: 16 
+  },
 });
