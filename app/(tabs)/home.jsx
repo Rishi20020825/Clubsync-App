@@ -15,6 +15,12 @@ export default function HomeScreen() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [clubsData, setClubsData] = useState([]);
+    const [allClubsCount, setAllClubsCount] = useState(0);
+    const [eventCount, setEventCount] = useState(0);
+    const [registeredEvents, setRegisteredEvents] = useState(0);
+    const [certCount, setCertCount] = useState(0);
+    const [statsLoading, setStatsLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const { isOrganizer, loading: organizerLoading, checkStatus } = useOrganizer();
     const router = useRouter();
 
@@ -23,18 +29,72 @@ export default function HomeScreen() {
             try {
                 const userData = await AsyncStorage.getItem('user');
                 if (userData) {
-                    setUser(JSON.parse(userData));
+                    const parsedUser = JSON.parse(userData);
+                    console.log('User data loaded:', parsedUser);
+                    setUser(parsedUser);
+                } else {
+                    console.warn('No user data found in AsyncStorage');
+                    // If no user in AsyncStorage, try to fetch it from API
+                    await fetchUserFromApi();
                 }
             } catch (error) {
                 console.error('Error fetching user data:', error);
+                // Try to fetch user from API as fallback
+                await fetchUserFromApi();
             }
-            fetchClubs();
+            
+            // Fetch data in parallel for better performance
+            await Promise.all([
+                fetchClubs(),
+                fetchStats()
+            ]);
+            
             // The organizer status is automatically checked by the OrganizerProvider
             // We can optionally refresh it here
             checkStatus();
         };
         fetchInitialData();
     }, []);
+    
+    const fetchUserFromApi = async () => {
+        try {
+            const token = await AsyncStorage.getItem('token');
+            if (!token) return;
+            
+            const response = await fetch(`${netconfig.API_BASE_URL}/api/users/me`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (response.ok) {
+                const userData = await response.json();
+                console.log('User fetched from API:', userData);
+                setUser(userData);
+                // Update AsyncStorage with latest user data
+                await AsyncStorage.setItem('user', JSON.stringify(userData));
+            }
+        } catch (err) {
+            console.error('Failed to fetch user from API:', err);
+        }
+    };
+    
+    const handleRefresh = async () => {
+        setRefreshing(true);
+        try {
+            // Fetch all data in parallel for efficiency
+            await Promise.all([
+                fetchUserFromApi(),
+                fetchClubs(),
+                fetchStats()
+            ]);
+            
+            // Show success feedback
+            console.log('Home screen data refreshed successfully');
+        } catch (error) {
+            console.error('Error refreshing home screen data:', error);
+        } finally {
+            setRefreshing(false);
+        }
+    };
 
     const fetchClubs = async () => {
         setLoading(true);
@@ -43,17 +103,93 @@ export default function HomeScreen() {
             const token = await AsyncStorage.getItem('token');
             if (!token) throw new Error('User not authenticated');
 
-            const res = await fetch(`${netconfig.API_BASE_URL}/api/clubs/mobile`, {
+            const userData = await AsyncStorage.getItem('user');
+            const localUser = JSON.parse(userData);
+
+            const response = await fetch(`${netconfig.API_BASE_URL}/api/clubs/mobile?userId=${localUser.id}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            if (!res.ok) throw new Error('Failed to fetch clubs');
-            const data = await res.json();
-            setClubsData(data.slice(0, 2) || []); // Only take first 2 for preview
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch clubs: ${response.status}`);
+            }
+            
+            const clubs = await response.json();
+            
+            // Set the total count of user's clubs
+            setAllClubsCount(Array.isArray(clubs) ? clubs.length : 0);
+            
+            // Only take first 2 for preview in the clubs section
+            setClubsData(Array.isArray(clubs) ? clubs.slice(0, 2) : []);
         } catch (err) {
+            console.error('Error fetching clubs:', err);
             setError(err.message);
             setClubsData([]);
+            setAllClubsCount(0);
         }
         setLoading(false);
+    };
+    
+    // Fetch real data for event counts and certificates
+    const fetchStats = async () => {
+        setStatsLoading(true);
+        try {
+            const token = await AsyncStorage.getItem('token');
+            if (!token) {
+                console.log('No auth token found, skipping stats fetch');
+                setStatsLoading(false);
+                return;
+            }
+            
+            // Fetch events count (all available events)
+            try {
+                const eventsResponse = await fetch(`${netconfig.API_BASE_URL}/api/events`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (eventsResponse.ok) {
+                    const eventsData = await eventsResponse.json();
+                    // Handle different response structures
+                    const events = eventsData?.events || eventsData?.data || [];
+                    setEventCount(Array.isArray(events) ? events.length : 0);
+                }
+            } catch (err) {
+                console.error('Error fetching events:', err);
+            }
+            
+            // Fetch registered events (user's events)
+            try {
+                const registeredResponse = await fetch(`${netconfig.API_BASE_URL}/api/events/registered`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (registeredResponse.ok) {
+                    const registeredData = await registeredResponse.json();
+                    const userEvents = registeredData?.events || registeredData?.data || [];
+                    setRegisteredEvents(Array.isArray(userEvents) ? userEvents.length : 0);
+                }
+            } catch (err) {
+                console.error('Error fetching registered events:', err);
+            }
+            
+            // Fetch certificates count
+            try {
+                const certResponse = await fetch(`${netconfig.API_BASE_URL}/api/certificates`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (certResponse.ok) {
+                    const certData = await certResponse.json();
+                    const certificates = certData?.certificates || certData?.data || [];
+                    setCertCount(Array.isArray(certificates) ? certificates.length : 0);
+                }
+            } catch (err) {
+                console.error('Error fetching certificates:', err);
+                // If API not available, set a default value based on registered events
+                setCertCount(Math.floor(registeredEvents * 0.7));
+            }
+        } catch (err) {
+            console.error('Error fetching stats:', err);
+        } finally {
+            setStatsLoading(false);
+        }
     };
 
     return (
@@ -68,9 +204,25 @@ export default function HomeScreen() {
                                 </LinearGradient>
                                 <Text style={styles.brandText}>ClubSync</Text>
                             </View>
-                            <TouchableOpacity style={styles.notificationButton}>
-                                <Feather name="bell" size={20} color="#f97316" />
-                            </TouchableOpacity>
+                            <View style={styles.headerButtons}>
+                                <TouchableOpacity 
+                                    style={styles.refreshButton} 
+                                    onPress={handleRefresh}
+                                    disabled={refreshing}
+                                >
+                                    {refreshing ? (
+                                        <ActivityIndicator size="small" color="#f97316" />
+                                    ) : (
+                                        <Feather name="refresh-cw" size={18} color="#f97316" />
+                                    )}
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                    style={styles.notificationButton}
+                                    onPress={() => router.push('/profile/notifications')}
+                                >
+                                    <Feather name="bell" size={20} color="#f97316" />
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     </View>
                     <ScrollView style={styles.homeContainer} showsVerticalScrollIndicator={false} contentContainerStyle={styles.homeScrollContent}>
@@ -78,14 +230,40 @@ export default function HomeScreen() {
                             <View style={styles.heroContent}>
                                 <View style={styles.greetingContainer}>
                                     <Text style={styles.greetingText}>Good Afternoon!</Text>
-                                    <Text style={styles.userNameText}>{user?.firstName || 'Welcome!'}</Text>
+                                    <Text style={styles.userNameText}>{user?.name || user?.firstName || 'Welcome!'}</Text>
                                     <Text style={styles.motivationText}>Ready to make today amazing? ✨</Text>
                                 </View>
                             </View>
                             <View style={styles.heroStatsContainer}>
-                                <View style={styles.heroStatCard}><Feather name="calendar" size={16} color="#ffffff" /><Text style={styles.heroStatNumber}>12</Text><Text style={styles.heroStatLabel}>Events</Text></View>
-                                <View style={styles.heroStatCard}><Feather name="users" size={16} color="#ffffff" /><Text style={styles.heroStatNumber}>5</Text><Text style={styles.heroStatLabel}>Clubs</Text></View>
-                                <View style={styles.heroStatCard}><Feather name="award" size={16} color="#ffffff" /><Text style={styles.heroStatNumber}>8</Text><Text style={styles.heroStatLabel}>Certs</Text></View>
+                                <View style={styles.heroStatCard}>
+                                    <Feather name="calendar" size={16} color="#ffffff" />
+                                    {statsLoading ? (
+                                        <ActivityIndicator size="small" color="#ffffff" style={{marginVertical: 4}} />
+                                    ) : (
+                                        <Text style={styles.heroStatNumber}>{registeredEvents}</Text>
+                                    )}
+                                    <Text style={styles.heroStatLabel}>My Events</Text>
+                                </View>
+                                
+                                <View style={styles.heroStatCard}>
+                                    <Feather name="users" size={16} color="#ffffff" />
+                                    {statsLoading ? (
+                                        <ActivityIndicator size="small" color="#ffffff" style={{marginVertical: 4}} />
+                                    ) : (
+                                        <Text style={styles.heroStatNumber}>{allClubsCount}</Text>
+                                    )}
+                                    <Text style={styles.heroStatLabel}>My Clubs</Text>
+                                </View>
+                                
+                                <View style={styles.heroStatCard}>
+                                    <Feather name="award" size={16} color="#ffffff" />
+                                    {statsLoading ? (
+                                        <ActivityIndicator size="small" color="#ffffff" style={{marginVertical: 4}} />
+                                    ) : (
+                                        <Text style={styles.heroStatNumber}>{eventCount}</Text>
+                                    )}
+                                    <Text style={styles.heroStatLabel}>My Certificates</Text>
+                                </View>
                             </View>
                         </LinearGradient>
 
@@ -134,15 +312,50 @@ export default function HomeScreen() {
                                 <Text style={styles.sectionTitle}>My Active Clubs</Text>
                                 <Link href="/(tabs)/clubs" asChild><TouchableOpacity><Text style={styles.viewAllText}>View All</Text></TouchableOpacity></Link>
                             </View>
-                            {loading ? <Text>Loading clubs...</Text> : error ? <Text>Error: {error}</Text> : clubsData.length > 0 ? (
+                            {loading ? (
+                                <View style={styles.loadingContainer}>
+                                    <ActivityIndicator size="small" color="#f97316" />
+                                    <Text style={styles.loadingText}>Loading your clubs...</Text>
+                                </View>
+                            ) : error ? (
+                                <View style={styles.errorContainer}>
+                                    <Text style={styles.errorText}>Error: {error}</Text>
+                                    <TouchableOpacity onPress={fetchClubs} style={styles.retryButton}>
+                                        <Text style={styles.retryText}>Retry</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : clubsData.length > 0 ? (
                                 clubsData.map((club) => (
-                                    <TouchableOpacity key={club.id} style={styles.clubPreviewCard}>
-                                        <Image source={club.profileImage ? { uri: club.profileImage } : require('../../assets/3.png')} style={styles.clubPreviewImage} />
-                                        <View style={styles.clubPreviewInfo}><Text style={styles.clubPreviewName}>{club.name}</Text><Text style={styles.clubPreviewCategory}>{club.category || 'Community'} • {club._count?.members || 0} members</Text></View>
+                                    <TouchableOpacity 
+                                        key={club.id} 
+                                        style={styles.clubPreviewCard}
+                                        onPress={() => router.push({
+                                            pathname: '/clubDetails',
+                                            params: {
+                                                clubId: club.id,
+                                                isMember: 'true'  // Since these are the user's clubs, they are members
+                                            }
+                                        })}
+                                    >
+                                        <Image 
+                                            source={club.profileImage ? { uri: club.profileImage } : require('../../assets/3.png')} 
+                                            style={styles.clubPreviewImage} 
+                                        />
+                                        <View style={styles.clubPreviewInfo}>
+                                            <Text style={styles.clubPreviewName}>{club.name}</Text>
+                                            <Text style={styles.clubPreviewCategory}>{club.category || 'Community'} • {club._count?.members || 0} members</Text>
+                                        </View>
                                     </TouchableOpacity>
                                 ))
                             ) : (
-                                <Text>No active clubs found.</Text>
+                                <View style={styles.emptyContainer}>
+                                    <Text style={styles.emptyText}>You're not a member of any clubs yet.</Text>
+                                    <Link href="/(tabs)/clubs" asChild>
+                                        <TouchableOpacity style={styles.findClubsButton}>
+                                            <Text style={styles.findClubsText}>Find Clubs to Join</Text>
+                                        </TouchableOpacity>
+                                    </Link>
+                                </View>
                             )}
                         </View>
 
@@ -163,6 +376,8 @@ const styles = StyleSheet.create({
     brandRow: { flexDirection: 'row', alignItems: 'center' },
     brandIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
     brandText: { fontSize: 20, fontWeight: '700', color: '#000000' },
+    headerButtons: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    refreshButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#fff7ed', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#fed7aa' },
     notificationButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#fff7ed', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#fed7aa' },
     homeContainer: { flex: 1, backgroundColor: 'transparent' },
     homeScrollContent: { paddingBottom: 80 },
@@ -192,4 +407,14 @@ const styles = StyleSheet.create({
     clubPreviewInfo: { flex: 1 },
     clubPreviewName: { fontSize: 16, fontWeight: '700', color: '#000000', marginBottom: 4 },
     clubPreviewCategory: { fontSize: 13, color: '#6b7280' },
+    loadingContainer: { padding: 20, alignItems: 'center', justifyContent: 'center' },
+    loadingText: { marginTop: 8, color: '#6b7280', fontSize: 14 },
+    errorContainer: { padding: 20, alignItems: 'center', justifyContent: 'center' },
+    errorText: { color: '#ef4444', marginBottom: 12, fontSize: 14 },
+    retryButton: { backgroundColor: '#f97316', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
+    retryText: { color: '#ffffff', fontWeight: '600', fontSize: 14 },
+    emptyContainer: { padding: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb', borderRadius: 12 },
+    emptyText: { color: '#6b7280', marginBottom: 16, textAlign: 'center', fontSize: 15 },
+    findClubsButton: { backgroundColor: '#f97316', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
+    findClubsText: { color: '#ffffff', fontWeight: '600', fontSize: 14 },
 });
