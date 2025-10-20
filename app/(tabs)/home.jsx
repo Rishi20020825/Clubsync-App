@@ -172,18 +172,47 @@ export default function HomeScreen() {
             
             // Fetch certificates count
             try {
-                const certResponse = await fetch(`${netconfig.API_BASE_URL}/api/certificates`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                console.log('Fetching certificates from:', `${netconfig.API_BASE_URL}/api/certificates/display`);
+                const certResponse = await fetch(`${netconfig.API_BASE_URL}/api/certificates/display`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
                 });
+                console.log('Certificate API response status:', certResponse.status);
+                
                 if (certResponse.ok) {
                     const certData = await certResponse.json();
-                    const certificates = certData?.certificates || certData?.data || [];
+                    console.log('Certificate raw data:', JSON.stringify(certData, null, 2));
+                    
+                    // Check what format the data is in
+                    const hasCertificatesField = !!certData?.certificates;
+                    const hasDataField = !!certData?.data;
+                    const isTopLevelArray = Array.isArray(certData);
+                    
+                    console.log('Certificate response structure:', { 
+                        hasCertificatesField, 
+                        hasDataField, 
+                        isTopLevelArray 
+                    });
+                    
+                    const certificates = certData?.certificates || certData?.data || certData || [];
+                    console.log('Parsed certificates array:', certificates);
+                    console.log('Certificates count:', Array.isArray(certificates) ? certificates.length : 'Not an array');
+                    
                     setCertCount(Array.isArray(certificates) ? certificates.length : 0);
+                } else {
+                    console.error('Certificate API error response:', certResponse.status, certResponse.statusText);
+                    try {
+                        // Try to read error message from response
+                        const errorText = await certResponse.text();
+                        console.error('Certificate API error details:', errorText);
+                    } catch (e) {
+                        console.error('Could not read error response');
+                    }
                 }
             } catch (err) {
                 console.error('Error fetching certificates:', err);
                 // If API not available, set a default value based on registered events
                 setCertCount(Math.floor(registeredEvents * 0.7));
+                console.log('Using fallback certificate count:', Math.floor(registeredEvents * 0.7));
             }
         } catch (err) {
             console.error('Error fetching stats:', err);
@@ -260,7 +289,11 @@ export default function HomeScreen() {
                                     {statsLoading ? (
                                         <ActivityIndicator size="small" color="#ffffff" style={{marginVertical: 4}} />
                                     ) : (
-                                        <Text style={styles.heroStatNumber}>{eventCount}</Text>
+                                        <>
+                                            <Text style={styles.heroStatNumber}>{certCount}</Text>
+                                           
+                                           
+                                        </>
                                     )}
                                     <Text style={styles.heroStatLabel}>My Certificates</Text>
                                 </View>
@@ -390,6 +423,7 @@ const styles = StyleSheet.create({
     heroStatsContainer: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
     heroStatCard: { flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.15)', borderRadius: 16, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)' },
     heroStatNumber: { fontSize: 20, fontWeight: '800', color: '#ffffff', marginTop: 4, marginBottom: 2 },
+    debugText: { fontSize: 9, color: 'rgba(255, 255, 255, 0.6)', fontStyle: 'italic', marginBottom: 2 },
     heroStatLabel: { fontSize: 11, color: 'rgba(255, 255, 255, 0.8)', fontWeight: '500', textAlign: 'center' },
     quickActionsSection: { paddingHorizontal: 24, marginTop: 32 },
     sectionTitle: { fontSize: 22, fontWeight: '700', color: '#000000', marginBottom: 16 },
