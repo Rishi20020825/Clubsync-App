@@ -24,13 +24,44 @@ export default function ClubDetailsScreen() {
     const [feedbackComment, setFeedbackComment] = useState('');
     const [submittingFeedback, setSubmittingFeedback] = useState(false);
     const [feedbackError, setFeedbackError] = useState(null);
+    const [isUserMember, setIsUserMember] = useState(false);
 
     useEffect(() => {
         fetchClubDetails();
+        checkUserMembership();
         if (isMember === 'false') {
             checkJoinRequestStatus();
         }
     }, [clubId]);
+
+    const checkUserMembership = async () => {
+        try {
+            const userData = await AsyncStorage.getItem('user');
+            if (!userData) {
+                setIsUserMember(false);
+                return;
+            }
+            const localUser = JSON.parse(userData);
+            const token = await AsyncStorage.getItem('token');
+
+            const response = await fetch(`${netconfig.API_BASE_URL}/api/clubs/${clubId}/members`, {
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+            });
+
+            if (!response.ok) {
+                setIsUserMember(false);
+                return;
+            }
+
+            const members = await response.json();
+            // members are clubMember objects with a nested `user` containing `id`
+            const found = Array.isArray(members) && members.some(m => (m.user && m.user.id) === localUser.id);
+            setIsUserMember(Boolean(found));
+        } catch (err) {
+            console.error('Error checking membership status:', err);
+            setIsUserMember(false);
+        }
+    };
 
     const fetchClubDetails = async () => {
         setLoading(true);
@@ -330,8 +361,9 @@ export default function ClubDetailsScreen() {
                     </View>
                 </View>
 
-                {/* Feedback form (mobile users) */}
-                <View style={styles.section}>
+                {/* Feedback form (mobile users) - only visible to club members */}
+                {(isFullDetails || isUserMember) && (
+                    <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Leave Feedback</Text>
                     <Text style={styles.sectionText}>Share your experience with this club — rate and leave a short comment.</Text>
 
@@ -368,7 +400,8 @@ export default function ClubDetailsScreen() {
                             )}
                         </TouchableOpacity>
                     </View>
-                </View>
+                    </View>
+                )}
 
                 <View style={{ height: 60 }} />
             </ScrollView>
