@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { netconfig } from '../netconfig';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import JoinRequestModal from '../components/JoinRequestModal'; // Adjust this path if your component is elsewhere
-
+import LoadingAnimation from '../components/LoadingAnimation';
 export default function ClubDetailsScreen() {
     const { clubId, isMember } = useLocalSearchParams();
     const router = useRouter();
@@ -196,10 +196,10 @@ export default function ClubDetailsScreen() {
     if (loading) {
         return (
             <SafeAreaView style={styles.safeArea}>
-                <View style={styles.centerContainer}>
-                    <ActivityIndicator size="large" color="#f97316" />
-                    <Text style={styles.loadingText}>Loading club details...</Text>
-                </View>
+                <LoadingAnimation 
+                    message="Loading Club Details" 
+                    subMessage="Getting club information"
+                />
             </SafeAreaView>
         );
     }

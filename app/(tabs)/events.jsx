@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { eventsService } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import LoadingAnimation from '../../components/LoadingAnimation';
 
 // Utility function to properly capitalize category names
 const capitalizeCategory = (category) => {
@@ -768,12 +769,6 @@ export default function EventsScreen() {
           <Text style={styles.eventsCount}>
             {filteredEvents.length} {filteredEvents.length === 1 ? 'Event' : 'Events'} Found
           </Text>
-          <View style={{flexDirection: 'row', gap: 8}}>
-            <TouchableOpacity style={styles.sortButton}>
-              <Feather name="filter" size={16} color="#6b7280" />
-              <Text style={styles.sortButtonText}>Sort</Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
         {filteredEvents.map((event) => (
@@ -938,10 +933,10 @@ export default function EventsScreen() {
           <>
             {/* Only show loading indicator on first data load */}
             {loading && !dataLoaded[activeTab] ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#f97316" />
-                <Text style={styles.loadingText}>Loading events...</Text>
-              </View>
+              <LoadingAnimation 
+                message="Loading Events" 
+                subMessage="Discovering amazing volunteering opportunities"
+              />
             ) : renderContent()}
           </>
         )}
@@ -1176,27 +1171,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#000000',
-  },
-  sortButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  sortButtonText: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginLeft: 6,
-    fontWeight: '500',
   },
   eventsList: {
     paddingHorizontal: 24,

@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import eventsService from '../../services/EventsService';
 import { normalizeEventData, getDefaultImageForCategory } from '../../utils/eventUtils';
 import { netconfig } from '../../netconfig';
+import LoadingAnimation from '../../components/LoadingAnimation';
 
 // Suppress console errors in production
 if (process.env.NODE_ENV === 'production') {
@@ -520,10 +521,10 @@ export default function EventDetailsScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#f97316" />
-          <Text style={styles.loadingText}>Loading event details...</Text>
-        </View>
+        <LoadingAnimation 
+          message="Loading Event Details" 
+          subMessage="Getting event information"
+        />
       </View>
     );
   }

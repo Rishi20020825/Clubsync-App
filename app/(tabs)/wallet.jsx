@@ -10,6 +10,7 @@ import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
 import Certificate from '../../components/Certificate';
+import LoadingAnimation from '../../components/LoadingAnimation';
 
 export default function WalletScreen() {
     const [certificates, setCertificates] = useState([]);
@@ -282,10 +283,10 @@ export default function WalletScreen() {
                 
                 <View style={styles.certificatesContainer}>
                     {loading ? (
-                        <View style={styles.loadingContainer}>
-                            <ActivityIndicator size="large" color="#f97316" />
-                            <Text style={styles.loadingText}>Loading your certificates...</Text>
-                        </View>
+                        <LoadingAnimation 
+                            message="Loading Certificates" 
+                            subMessage="Fetching your achievements"
+                        />
                     ) : error ? (
                         <View style={styles.errorContainer}>
                             <Feather name="alert-circle" size={48} color="#ef4444" style={styles.errorIcon} />

@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { netconfig } from '../../netconfig';
 import { useRouter } from 'expo-router';
+import LoadingAnimation from '../../components/LoadingAnimation';
 
 export default function ClubsScreen() {
     const router = useRouter();
@@ -83,7 +84,10 @@ export default function ClubsScreen() {
 
     const renderClubs = (clubs) => {
         if (loading) {
-            return <View style={styles.centerStatus}><ActivityIndicator size="large" color="#f97316" /><Text style={styles.statusText}>Loading clubs...</Text></View>;
+            return <LoadingAnimation 
+                message="Loading Clubs" 
+                subMessage="Discovering amazing clubs"
+            />;
         }
         if (error) {
             return <View style={styles.centerStatus}><Feather name="alert-circle" size={48} color="#ef4444" /><Text style={styles.statusText}>{error}</Text><TouchableOpacity onPress={activeTab === 'your' ? fetchUserClubs : fetchAllClubs}><Text style={styles.retryText}>Try Again</Text></TouchableOpacity></View>;

@@ -162,5 +162,5 @@ const getOrganizerEmail = (event) => {
     return event.club.email;
   }
   
-  return event.organizerEmail || event.contactEmail || 'contact@example.com';
+  return event.organizerEmail || event.contactEmail || 'contact@clubsync.me';
 };

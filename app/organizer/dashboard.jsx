@@ -7,6 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import LoadingAnimation from '../../components/LoadingAnimation';
 export default function OrganizerDashboard() {
   const [events, setEvents] = useState([]);
   const router = useRouter();
@@ -178,10 +179,10 @@ export default function OrganizerDashboard() {
 
           {/* Events List */}
           {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#f97316" />
-              <Text style={styles.loadingText}>Loading your events...</Text>
-            </View>
+            <LoadingAnimation 
+              message="Loading Your Events" 
+              subMessage="Fetching your organized events"
+            />
           ) : events.length === 0 ? (
             <View style={styles.emptyContainer}>
               <LinearGradient colors={['#f97316', '#ef4444']} style={styles.emptyIcon}>
