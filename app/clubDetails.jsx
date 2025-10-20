@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, Image, TouchableOpacity, ActivityIndicator, Linking, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Image, TouchableOpacity, ActivityIndicator, Linking, Alert, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,6 +19,11 @@ export default function ClubDetailsScreen() {
 
     // State to control the modal's visibility
     const [isModalVisible, setModalVisible] = useState(false);
+    // Feedback form state
+    const [feedbackRating, setFeedbackRating] = useState(5);
+    const [feedbackComment, setFeedbackComment] = useState('');
+    const [submittingFeedback, setSubmittingFeedback] = useState(false);
+    const [feedbackError, setFeedbackError] = useState(null);
 
     useEffect(() => {
         fetchClubDetails();
@@ -106,6 +111,55 @@ export default function ClubDetailsScreen() {
 
     const openLink = (url) => {
         if (url) Linking.openURL(url);
+    };
+
+    const submitFeedback = async () => {
+        if (!feedbackComment.trim()) {
+            setFeedbackError('Please add a short comment.');
+            return;
+        }
+
+        setSubmittingFeedback(true);
+        setFeedbackError(null);
+
+        try {
+            const userData = await AsyncStorage.getItem('user');
+            const token = await AsyncStorage.getItem('token');
+            const localUser = userData ? JSON.parse(userData) : null;
+
+            const body = {
+                clubId: clubId,
+                userId: localUser?.id ?? null,
+                rating: Number(feedbackRating),
+                comment: feedbackComment,
+            };
+
+            const res = await fetch(`${netconfig.API_BASE_URL}/api/clubs/${clubId}/feedbacks`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify(body),
+            });
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || `Failed to submit feedback (${res.status})`);
+            }
+
+            // On success, clear form, show alert and refresh club details or feedback status
+            setFeedbackComment('');
+            setFeedbackRating(5);
+            Alert.alert('Thank you', 'Your feedback has been submitted.');
+
+            // Optionally refetch club details to update any counts if the API returns updated data
+            fetchClubDetails();
+        } catch (err) {
+            setFeedbackError(err instanceof Error ? err.message : String(err));
+        } finally {
+            setSubmittingFeedback(false);
+        }
     };
 
     if (loading) {
@@ -273,6 +327,46 @@ export default function ClubDetailsScreen() {
                                 <Feather name="twitter" size={24} color="#f97316" />
                             </TouchableOpacity>
                         )}
+                    </View>
+                </View>
+
+                {/* Feedback form (mobile users) */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Leave Feedback</Text>
+                    <Text style={styles.sectionText}>Share your experience with this club — rate and leave a short comment.</Text>
+
+                    <View style={{ flexDirection: 'row', marginTop: 12, alignItems: 'center' }}>
+                        {[1,2,3,4,5].map((i) => (
+                            <TouchableOpacity key={i} onPress={() => setFeedbackRating(i)} style={{ marginRight: 8 }}>
+                                <Feather name="star" size={28} color={i <= feedbackRating ? '#f97316' : '#e5e7eb'} />
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+
+                    <TextInput
+                        value={feedbackComment}
+                        onChangeText={setFeedbackComment}
+                        placeholder="Write a short comment (required)"
+                        placeholderTextColor="#9ca3af"
+                        multiline
+                        numberOfLines={3}
+                        style={styles.feedbackInput}
+                    />
+
+                    {feedbackError ? <Text style={{ color: '#ef4444', marginTop: 8 }}>{feedbackError}</Text> : null}
+
+                    <View style={{ marginTop: 12 }}>
+                        <TouchableOpacity
+                            style={[styles.joinButton, submittingFeedback && { opacity: 0.6 }]}
+                            onPress={submitFeedback}
+                            disabled={submittingFeedback}
+                        >
+                            {submittingFeedback ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={styles.joinButtonText}>Submit Feedback</Text>
+                            )}
+                        </TouchableOpacity>
                     </View>
                 </View>
 
