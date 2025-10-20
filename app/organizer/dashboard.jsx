@@ -150,12 +150,6 @@ export default function OrganizerDashboard() {
               >
                 <Feather name="arrow-left" size={20} color="#f97316" />
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.iconButtonDanger} 
-                onPress={handleSignOut}
-              >
-                <Feather name="log-out" size={20} color="#ef4444" />
-              </TouchableOpacity>
             </View>
           </View>
 

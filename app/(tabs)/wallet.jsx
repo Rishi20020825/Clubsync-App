@@ -277,7 +277,7 @@ export default function WalletScreen() {
             >
                 <LinearGradient colors={['#f97316', '#ef4444']} style={styles.pageHeader}>
                     <Feather name="award" size={32} color="#ffffff" />
-                    <Text style={styles.pageTitle}>Your Wallet</Text>
+                    <Text style={styles.pageTitle}>Certificate Wallet</Text>
                     <Text style={styles.pageSubtitle}>Track your achievements and certificates</Text>
                 </LinearGradient>
                 
@@ -322,16 +322,10 @@ export default function WalletScreen() {
                                         <Text style={styles.certificateTitle}>{certificate.eventName || certificate.title}</Text>
                                         <Text style={styles.certificateIssuer}>by {certificate.clubName || certificate.issuer}</Text>
                                         <Text style={styles.certificateDate}>
-                                            {new Date(certificate.eventDate || certificate.dateEarned).toLocaleDateString()}
+                                            {certificate.eventDate || (certificate.dateEarned ? new Date(certificate.dateEarned).toLocaleDateString() : 'Date not available')}
                                         </Text>
                                     </View>
                                     <Feather name="eye" size={20} color="#f97316" />
-                                </View>
-                                <View style={styles.certificateFooter}>
-                                    <View style={styles.statusBadge}>
-                                        <Text style={styles.statusText}>View Certificate</Text>
-                                    </View>
-                                    <Text style={styles.credentialId}>ID: {certificate.certificateId || certificate.credentialId || certificate.id}</Text>
                                 </View>
                             </TouchableOpacity>
                         ))
@@ -358,13 +352,7 @@ export default function WalletScreen() {
                     </View>
 
                     {/* Certificate Preview */}
-                    <ScrollView 
-                        style={styles.certificateScrollView}
-                        contentContainerStyle={styles.certificateScrollContent}
-                        maximumZoomScale={2}
-                        minimumZoomScale={0.5}
-                        showsVerticalScrollIndicator={false}
-                    >
+                    <View style={styles.certificateScrollView}>
                         {selectedCertificate && (
                             <View style={styles.certificateWrapper}>
                                 <View 
@@ -382,7 +370,7 @@ export default function WalletScreen() {
                                 </View>
                             </View>
                         )}
-                    </ScrollView>
+                    </View>
 
                     {/* Action Buttons */}
                     <View style={styles.certificateActions}>
@@ -391,7 +379,7 @@ export default function WalletScreen() {
                             onPress={handleDownloadCertificate}
                             disabled={downloading}
                         >
-                            <LinearGradient colors={['#10b981', '#059669']} style={styles.actionButtonGradient}>
+                            <LinearGradient colors={['#f97316', '#ef4444']} style={styles.actionButtonGradient}>
                                 {downloading ? (
                                     <ActivityIndicator color="#ffffff" />
                                 ) : (
@@ -407,7 +395,7 @@ export default function WalletScreen() {
                             style={styles.actionButton}
                             onPress={handleShareCertificate}
                         >
-                            <LinearGradient colors={['#3b82f6', '#1d4ed8']} style={styles.actionButtonGradient}>
+                            <LinearGradient colors={['#f97316', '#ef4444']} style={styles.actionButtonGradient}>
                                 <Feather name="share-2" size={20} color="#ffffff" />
                                 <Text style={styles.actionButtonText}>Share</Text>
                             </LinearGradient>
@@ -562,22 +550,23 @@ const styles = StyleSheet.create({
     },
     certificateScrollView: {
         flex: 1,
-    },
-    certificateScrollContent: {
-        padding: 20,
+        backgroundColor: '#f9fafb',
         alignItems: 'center',
+        justifyContent: 'center',
     },
     certificateWrapper: {
         alignItems: 'center',
         justifyContent: 'center',
     },
     certificateContainer: {
-        transform: [{ scale: 0.3 }],
+        transform: [{ scale: 0.32 }],
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.15,
         shadowRadius: 16,
         elevation: 10,
+        backgroundColor: '#ffffff',
+        borderRadius: 8,
     },
     certificateActions: {
         flexDirection: 'row',
@@ -784,30 +773,6 @@ const styles = StyleSheet.create({
     },
     certificateDate: {
         fontSize: 12, 
-        color: '#9ca3af',
-    },
-    certificateFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginTop: 12,
-        paddingTop: 12,
-        borderTopWidth: 1,
-        borderTopColor: '#f3f4f6',
-    },
-    statusBadge: {
-        backgroundColor: '#ecfdf5',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    statusText: {
-        fontSize: 12,
-        color: '#10b981',
-        fontWeight: '500',
-    },
-    credentialId: {
-        fontSize: 12,
         color: '#9ca3af',
     },
 });

@@ -16,6 +16,7 @@ import { netconfig } from '../../../netconfig';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import SuccessScreen from '../../../components/SuccessScreen';
 
 export default function OrganizerEventScreen() {
   const { id: eventId } = useLocalSearchParams();
@@ -25,6 +26,8 @@ export default function OrganizerEventScreen() {
   const [notAttended, setNotAttended] = useState([]);
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [showScanSuccess, setShowScanSuccess] = useState(false);
+  const [scannedUserName, setScannedUserName] = useState('');
 
   const [permission, requestPermission] = useCameraPermissions();
   const slideAnim = useRef(new Animated.Value(1000)).current;
@@ -76,8 +79,17 @@ export default function OrganizerEventScreen() {
 
       const result = await res.json();
       if (result.success) {
-        Alert.alert('Success', 'Attendance marked!');
-        fetchAttendance();
+        // Find the user name from the attendance list
+        const user = result.user || { firstName: 'User', lastName: '' };
+        const userName = `${user.firstName} ${user.lastName}`.trim() || 'User';
+        setScannedUserName(userName);
+        setShowScanSuccess(true);
+        
+        // Auto-hide success screen and refresh attendance
+        setTimeout(() => {
+          setShowScanSuccess(false);
+          fetchAttendance();
+        }, 2500);
       } else {
         Alert.alert('Error', result.message || 'User is not registered.');
       }
@@ -117,6 +129,16 @@ export default function OrganizerEventScreen() {
           </View>
         </LinearGradient>
       </SafeAreaView>
+    );
+  }
+
+  if (showScanSuccess) {
+    return (
+      <SuccessScreen
+        title="Attendance Marked!"
+        message={`${scannedUserName}'s attendance has been successfully recorded.`}
+        type="scanned"
+      />
     );
   }
 

@@ -8,6 +8,7 @@ import { netconfig } from '../netconfig';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import JoinRequestModal from '../components/JoinRequestModal'; // Adjust this path if your component is elsewhere
 import LoadingAnimation from '../components/LoadingAnimation';
+import SuccessScreen from '../components/SuccessScreen';
 export default function ClubDetailsScreen() {
     const { clubId, isMember } = useLocalSearchParams();
     const router = useRouter();
@@ -16,6 +17,7 @@ export default function ClubDetailsScreen() {
     const [error, setError] = useState(null);
     const [joinRequestStatus, setJoinRequestStatus] = useState(null);
     const [submittingRequest, setSubmittingRequest] = useState(false);
+    const [showJoinSuccess, setShowJoinSuccess] = useState(false);
 
     // State to control the modal's visibility
     const [isModalVisible, setModalVisible] = useState(false);
@@ -126,8 +128,13 @@ export default function ClubDetailsScreen() {
 
             if (response.ok) {
                 setModalVisible(false); // Close modal on success
-                Alert.alert('Success', 'Your join request has been submitted!');
+                setShowJoinSuccess(true); // Show success screen
                 setJoinRequestStatus('pendingReview');
+                
+                // Auto-hide success screen after 3 seconds
+                setTimeout(() => {
+                    setShowJoinSuccess(false);
+                }, 3000);
             } else {
                 const errorData = await response.json();
                 throw new Error(errorData.error || 'Failed to submit join request');
@@ -201,6 +208,16 @@ export default function ClubDetailsScreen() {
                     subMessage="Getting club information"
                 />
             </SafeAreaView>
+        );
+    }
+
+    if (showJoinSuccess) {
+        return (
+            <SuccessScreen
+                title="Request Submitted!"
+                message={`Your request to join ${club?.name || 'the club'} has been submitted successfully. You'll be notified once it's reviewed.`}
+                type="joined"
+            />
         );
     }
 
