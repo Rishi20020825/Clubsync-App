@@ -1,10 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Modal, Alert, Image } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Modal, Alert, Image, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { netconfig } from '../../netconfig';
+import { captureRef } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system';
+import Certificate from '../../components/Certificate';
 
 export default function WalletScreen() {
     const [certificates, setCertificates] = useState([]);
@@ -13,6 +18,10 @@ export default function WalletScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [selectedCertificate, setSelectedCertificate] = useState(null);
     const [modalVisible, setModalVisible] = useState(false);
+    const [viewingCertificate, setViewingCertificate] = useState(false);
+    const [downloading, setDownloading] = useState(false);
+    const certificateRef = useRef(null);
+    // Don't use usePermissions hook, we'll request permission directly when needed
 
     const fetchCertificates = async (showLoading = true) => {
         if (showLoading) setLoading(true);
@@ -28,6 +37,9 @@ export default function WalletScreen() {
             
             const user = JSON.parse(userData);
             console.log('User data from storage:', user);
+            
+            // Get user's full name for certificates
+            const userFullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || `${user.userName || 'User'}`;
             
             // Make sure we have a valid user ID, use _id if id is not available
             const userId = user.id || user._id;
@@ -54,6 +66,11 @@ export default function WalletScreen() {
             if (!response.ok) {
                 if (response.status === 401) {
                     throw new Error('Your session has expired. Please log in again.');
+                } else if (response.status === 404) {
+                    // Certificate endpoint not found - API might not be implemented yet
+                    console.log('Certificate endpoint not found (404). Using empty certificates list.');
+                    setCertificates([]);
+                    return;
                 } else {
                     throw new Error(`Failed to fetch certificates (${response.status})`);
                 }
@@ -67,6 +84,32 @@ export default function WalletScreen() {
                 console.error('Error parsing API response as JSON:', jsonError);
                 throw new Error('Invalid response from server');
             }
+            
+            // Map certificates to include both old and new field names for compatibility
+            const mapCertificateData = (cert) => {
+                return {
+                    ...cert,
+                    // Map old field names to new ones (for backward compatibility with different API responses)
+                    eventName: cert.eventName || cert.title || 'Event',
+                    clubName: cert.clubName || cert.issuer || 'Club',
+                    eventDate: cert.eventDate || (cert.dateEarned ? new Date(cert.dateEarned).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    }) : new Date().toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    })),
+                    userName: cert.userName || userFullName, // Use user's actual name from AsyncStorage
+                    certificateId: cert.certificateId || cert.credentialId || cert.id,
+                    // Keep original fields too
+                    title: cert.title,
+                    issuer: cert.issuer,
+                    dateEarned: cert.dateEarned,
+                    credentialId: cert.credentialId,
+                };
+            };
             
             // Function to filter certificates by user ID if needed
             const filterByUserId = (certificates) => {
@@ -89,22 +132,24 @@ export default function WalletScreen() {
                     return certificates.filter(cert => cert.user._id === userId);
                 }
                 
-                // If we can't find a way to filter, log a warning and return all
-                console.warn('Could not determine how to filter certificates by user ID. Check certificate data structure:', certificates[0]);
+                // If we can't find a way to filter, assume API already filtered
+                console.log('No userId field found - assuming API already filtered certificates');
                 return certificates;
             };
             
             // Check if certificates array exists in the response
             if (Array.isArray(data.certificates)) {
                 // Filter certificates to ensure they belong to this user
-                const userCertificates = filterByUserId(data.certificates);
-                setCertificates(userCertificates);
+                const userCertificates = filterByUserId(data.certificates).map(mapCertificateData);
                 console.log(`Loaded ${userCertificates.length} certificates for user ${userId}`);
+                console.log('Sample certificate data:', userCertificates[0]);
+                setCertificates(userCertificates);
             } else if (Array.isArray(data)) {
                 // Filter certificates to ensure they belong to this user
-                const userCertificates = filterByUserId(data);
-                setCertificates(userCertificates);
+                const userCertificates = filterByUserId(data).map(mapCertificateData);
                 console.log(`Loaded ${userCertificates.length} certificates for user ${userId}`);
+                console.log('Sample certificate data:', userCertificates[0]);
+                setCertificates(userCertificates);
             } else {
                 console.warn('Unexpected API response format:', data);
                 setCertificates([]);
@@ -141,6 +186,86 @@ export default function WalletScreen() {
     useEffect(() => {
         fetchCertificates();
     }, []);
+
+    const handleViewCertificate = (certificate) => {
+        setSelectedCertificate(certificate);
+        setViewingCertificate(true);
+    };
+
+    const handleDownloadCertificate = async () => {
+        if (!certificateRef.current || !selectedCertificate) return;
+
+        try {
+            setDownloading(true);
+
+            // Request media library permission for writing only (no audio)
+            const { status } = await MediaLibrary.requestPermissionsAsync(false);
+            
+            if (status !== 'granted') {
+                Alert.alert('Permission Required', 'Please grant permission to save images to your device.');
+                setDownloading(false);
+                return;
+            }
+
+            // Capture the certificate as an image
+            const uri = await captureRef(certificateRef, {
+                format: 'png',
+                quality: 1.0,
+            });
+
+            // Save to media library
+            const asset = await MediaLibrary.createAssetAsync(uri);
+            
+            // Try to create album, but don't fail if it doesn't work
+            try {
+                await MediaLibrary.createAlbumAsync('ClubSync Certificates', asset, false);
+            } catch (albumError) {
+                console.log('Could not create album, but file was saved:', albumError);
+            }
+
+            Alert.alert('Success', 'Certificate saved to your gallery!');
+        } catch (error) {
+            console.error('Error downloading certificate:', error);
+            Alert.alert('Error', 'Failed to download certificate. Please try again.');
+        } finally {
+            setDownloading(false);
+        }
+    };
+
+    const handleShareCertificate = async () => {
+        if (!certificateRef.current || !selectedCertificate) return;
+
+        try {
+            // Check if sharing is available
+            const isAvailable = await Sharing.isAvailableAsync();
+            if (!isAvailable) {
+                Alert.alert('Error', 'Sharing is not available on this device');
+                return;
+            }
+
+            // Capture the certificate as an image
+            const uri = await captureRef(certificateRef, {
+                format: 'png',
+                quality: 1.0,
+            });
+
+            // Share the image
+            await Sharing.shareAsync(uri, {
+                mimeType: 'image/png',
+                dialogTitle: `Share ${selectedCertificate.eventName} Certificate`,
+            });
+        } catch (error) {
+            console.error('Error sharing certificate:', error);
+            Alert.alert('Error', 'Failed to share certificate. Please try again.');
+        }
+    };
+
+    const closeCertificateView = () => {
+        setViewingCertificate(false);
+        setTimeout(() => {
+            setSelectedCertificate(null);
+        }, 300);
+    };
     return (
         <SafeAreaView style={styles.safeArea}>
             <ScrollView 
@@ -183,10 +308,7 @@ export default function WalletScreen() {
                             <TouchableOpacity 
                                 key={certificate.id} 
                                 style={styles.certificateCard}
-                                onPress={() => {
-                                    setSelectedCertificate(certificate);
-                                    setModalVisible(true);
-                                }}
+                                onPress={() => handleViewCertificate(certificate)}
                             >
                                 <View style={styles.certificateHeader}>
                                     <LinearGradient 
@@ -196,30 +318,19 @@ export default function WalletScreen() {
                                         <Feather name='award' size={20} color="#ffffff" />
                                     </LinearGradient>
                                     <View style={styles.certificateInfo}>
-                                        <Text style={styles.certificateTitle}>{certificate.title}</Text>
-                                        <Text style={styles.certificateIssuer}>by {certificate.issuer}</Text>
+                                        <Text style={styles.certificateTitle}>{certificate.eventName || certificate.title}</Text>
+                                        <Text style={styles.certificateIssuer}>by {certificate.clubName || certificate.issuer}</Text>
                                         <Text style={styles.certificateDate}>
-                                            {new Date(certificate.dateEarned).toLocaleDateString()}
+                                            {new Date(certificate.eventDate || certificate.dateEarned).toLocaleDateString()}
                                         </Text>
                                     </View>
-                                </View>
-                                <Text style={styles.certificateDescription}>
-                                    {certificate.description || 'No description available'}
-                                </Text>
-                                <View style={styles.skillsContainer}>
-                                    {Array.isArray(certificate.skills) ? (
-                                        certificate.skills.map((skill, index) => (
-                                            <View key={index} style={styles.skillChip}>
-                                                <Text style={styles.skillChipText}>{skill}</Text>
-                                            </View>
-                                        ))
-                                    ) : null}
+                                    <Feather name="eye" size={20} color="#f97316" />
                                 </View>
                                 <View style={styles.certificateFooter}>
                                     <View style={styles.statusBadge}>
-                                        <Text style={styles.statusText}>{certificate.status || 'Issued'}</Text>
+                                        <Text style={styles.statusText}>View Certificate</Text>
                                     </View>
-                                    <Text style={styles.credentialId}>ID: {certificate.credentialId || certificate.id}</Text>
+                                    <Text style={styles.credentialId}>ID: {certificate.certificateId || certificate.credentialId || certificate.id}</Text>
                                 </View>
                             </TouchableOpacity>
                         ))
@@ -228,11 +339,87 @@ export default function WalletScreen() {
                 <View style={{ height: 120 }} />
             </ScrollView>
 
-            {/* Certificate Detail Modal */}
+            {/* Certificate Viewing Modal */}
+            <Modal
+                animationType="slide"
+                transparent={false}
+                visible={viewingCertificate}
+                onRequestClose={closeCertificateView}
+            >
+                <SafeAreaView style={styles.certificateModalContainer}>
+                    {/* Header */}
+                    <View style={styles.certificateModalHeader}>
+                        <TouchableOpacity onPress={closeCertificateView} style={styles.closeIconButton}>
+                            <Feather name="x" size={24} color="#000" />
+                        </TouchableOpacity>
+                        <Text style={styles.certificateModalTitle}>Certificate</Text>
+                        <View style={{ width: 40 }} />
+                    </View>
+
+                    {/* Certificate Preview */}
+                    <ScrollView 
+                        style={styles.certificateScrollView}
+                        contentContainerStyle={styles.certificateScrollContent}
+                        maximumZoomScale={2}
+                        minimumZoomScale={0.5}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        {selectedCertificate && (
+                            <View style={styles.certificateWrapper}>
+                                <View 
+                                    ref={certificateRef} 
+                                    collapsable={false}
+                                    style={styles.certificateContainer}
+                                >
+                                    <Certificate
+                                        userName={selectedCertificate.userName}
+                                        eventName={selectedCertificate.eventName}
+                                        clubName={selectedCertificate.clubName}
+                                        eventDate={selectedCertificate.eventDate}
+                                        certificateId={selectedCertificate.certificateId}
+                                    />
+                                </View>
+                            </View>
+                        )}
+                    </ScrollView>
+
+                    {/* Action Buttons */}
+                    <View style={styles.certificateActions}>
+                        <TouchableOpacity 
+                            style={styles.actionButton}
+                            onPress={handleDownloadCertificate}
+                            disabled={downloading}
+                        >
+                            <LinearGradient colors={['#10b981', '#059669']} style={styles.actionButtonGradient}>
+                                {downloading ? (
+                                    <ActivityIndicator color="#ffffff" />
+                                ) : (
+                                    <>
+                                        <Feather name="download" size={20} color="#ffffff" />
+                                        <Text style={styles.actionButtonText}>Download</Text>
+                                    </>
+                                )}
+                            </LinearGradient>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={styles.actionButton}
+                            onPress={handleShareCertificate}
+                        >
+                            <LinearGradient colors={['#3b82f6', '#1d4ed8']} style={styles.actionButtonGradient}>
+                                <Feather name="share-2" size={20} color="#ffffff" />
+                                <Text style={styles.actionButtonText}>Share</Text>
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    </View>
+                </SafeAreaView>
+            </Modal>
+
+            {/* Certificate Detail Modal (Old) */}
             <Modal
                 animationType="slide"
                 transparent={true}
-                visible={modalVisible}
+                visible={modalVisible && !viewingCertificate}
                 onRequestClose={() => {
                     setModalVisible(false);
                 }}
@@ -243,20 +430,20 @@ export default function WalletScreen() {
                             <>
                                 <LinearGradient 
                                     colors={['#f97316', '#ef4444']} 
-                                    style={styles.certificateModalHeader}
+                                    style={styles.certificateModalHeaderOld}
                                 >
                                     <View style={styles.certificateIconLarge}>
                                         <Feather name="award" size={32} color="#ffffff" />
                                     </View>
-                                    <Text style={styles.certificateModalTitle}>{selectedCertificate.title}</Text>
-                                    <Text style={styles.certificateModalIssuer}>Issued by {selectedCertificate.issuer}</Text>
+                                    <Text style={styles.certificateModalTitleOld}>{selectedCertificate.eventName || selectedCertificate.title}</Text>
+                                    <Text style={styles.certificateModalIssuer}>Issued by {selectedCertificate.clubName || selectedCertificate.issuer}</Text>
                                 </LinearGradient>
 
                                 <ScrollView style={styles.certificateModalBody}>
                                     <View style={styles.certificateDetailSection}>
                                         <Text style={styles.certificateDetailLabel}>Date Earned</Text>
                                         <Text style={styles.certificateDetailValue}>
-                                            {new Date(selectedCertificate.dateEarned).toLocaleDateString('en-US', {
+                                            {new Date(selectedCertificate.eventDate || selectedCertificate.dateEarned).toLocaleDateString('en-US', {
                                                 year: 'numeric', 
                                                 month: 'long', 
                                                 day: 'numeric'
@@ -267,7 +454,7 @@ export default function WalletScreen() {
                                     <View style={styles.certificateDetailSection}>
                                         <Text style={styles.certificateDetailLabel}>Description</Text>
                                         <Text style={styles.certificateDetailValue}>
-                                            {selectedCertificate.description || 'No description available'}
+                                            {selectedCertificate.description || 'Certificate of participation'}
                                         </Text>
                                     </View>
 
@@ -297,7 +484,7 @@ export default function WalletScreen() {
                                     <View style={styles.certificateDetailSection}>
                                         <Text style={styles.certificateDetailLabel}>Credential ID</Text>
                                         <Text style={styles.certificateDetailValue}>
-                                            {selectedCertificate.credentialId || selectedCertificate.id}
+                                            {selectedCertificate.certificateId || selectedCertificate.credentialId || selectedCertificate.id}
                                         </Text>
                                     </View>
                                     
@@ -344,7 +531,85 @@ const styles = StyleSheet.create({
     skillChip: { backgroundColor: '#f3f4f6', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4, marginRight: 6, marginBottom: 4 },
     skillChipText: { fontSize: 10, color: '#6b7280', fontWeight: '500' },
     
-    // Certificate modal styles
+    // Certificate viewing modal
+    certificateModalContainer: {
+        flex: 1,
+        backgroundColor: '#f9fafb',
+    },
+    certificateModalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        backgroundColor: '#ffffff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#f3f4f6',
+    },
+    closeIconButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#f3f4f6',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    certificateModalTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#000000',
+    },
+    certificateScrollView: {
+        flex: 1,
+    },
+    certificateScrollContent: {
+        padding: 20,
+        alignItems: 'center',
+    },
+    certificateWrapper: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    certificateContainer: {
+        transform: [{ scale: 0.3 }],
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.15,
+        shadowRadius: 16,
+        elevation: 10,
+    },
+    certificateActions: {
+        flexDirection: 'row',
+        padding: 20,
+        gap: 12,
+        backgroundColor: '#ffffff',
+        borderTopWidth: 1,
+        borderTopColor: '#f3f4f6',
+    },
+    actionButton: {
+        flex: 1,
+        borderRadius: 12,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    actionButtonGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 16,
+    },
+    actionButtonText: {
+        color: '#ffffff',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    
+    // Certificate modal styles (old)
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -358,7 +623,7 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         maxHeight: '90%',
     },
-    certificateModalHeader: {
+    certificateModalHeaderOld: {
         padding: 24,
         alignItems: 'center',
     },
@@ -371,7 +636,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         marginBottom: 16,
     },
-    certificateModalTitle: {
+    certificateModalTitleOld: {
         fontSize: 22,
         fontWeight: '700',
         color: '#ffffff',

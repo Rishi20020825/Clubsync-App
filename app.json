@@ -32,17 +32,23 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      
-  "expo-router",
-  "expo-web-browser",
-  [
-    "expo-barcode-scanner",
-    {
-      "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera for scanning QR codes."
-    }
-  ]
-]
-,
+      "expo-router",
+      "expo-web-browser",
+      [
+        "expo-barcode-scanner",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera for scanning QR codes."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to save certificates to your photo library.",
+          "savePhotosPermission": "Allow $(PRODUCT_NAME) to save certificates to your photo library.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ]
+    ],
     "extra": {
       "router": {},
       "eas": {
