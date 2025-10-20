@@ -479,6 +479,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff7ed',
+    marginTop: 30,
   },
   scrollContent: {
     paddingBottom: 140, // Space for floating tabs

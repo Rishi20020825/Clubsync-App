@@ -33,7 +33,7 @@ export const UserService = {
       if (!token) throw new Error('User not authenticated');
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
       const response = await fetch(`${netconfig.API_BASE_URL}/api/users/check-organizer`, {
         method: 'GET',
@@ -59,7 +59,12 @@ export const UserService = {
       
       return data;
     } catch (error) {
-      console.error('Failed to check organizer status:', error);
+      // Handle different error types
+      if (error.name === 'AbortError') {
+        console.log('Request timed out, using cached organizer status');
+      } else {
+        console.error('Failed to check organizer status:', error.message);
+      }
       
       // Try to use cached data as fallback if fetch fails
       try {

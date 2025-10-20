@@ -954,6 +954,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff7ed',
+    marginTop: 30,
   },
   mainContent: {
     flex: 1,
