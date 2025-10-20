@@ -1,593 +1,761 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather, MaterialCommunityIcons, FontAwesome, MaterialIcons } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { netconfig } from "../../netconfig";
 
-export default function ElectionPage() {
+const ElectionListPage = () => {
     const router = useRouter();
-    const [fadeAnim] = useState(new Animated.Value(0));
-    const [slideAnim] = useState(new Animated.Value(50));
-    const [activeTab, setActiveTab] = useState('overview');
-    const [isLoading, setIsLoading] = useState(false);
+    const [elections, setElections] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [refreshing, setRefreshing] = useState(false);
+    const [activeTab, setActiveTab] = useState('active');
+    const fadeAnim = React.useRef(new Animated.Value(0)).current;
+    const slideAnim = React.useRef(new Animated.Value(50)).current;
+    const tabSlideAnim = React.useRef(new Animated.Value(0)).current;
 
-    // Function to issue voting token
-    const issueVotingToken = async () => {
-        setIsLoading(true);
+    const fetchElections = async () => {
         try {
-            // Get auth token from storage
+            setLoading(true);
+            setError(null);
             const authToken = await AsyncStorage.getItem('token');
             if (!authToken) {
-                Alert.alert('Error', 'Please login to continue');
+                setError("You must be logged in to view elections.");
                 return;
             }
 
-            // Make API call to issue token
-            const response = await fetch(`${netconfig.API_BASE_URL}/api/voting/issue-token`, {
-                method: 'POST',
+            const response = await fetch(`${netconfig.API_BASE_URL}/api/elections`, {
                 headers: {
-                    'Authorization': `Bearer ${authToken}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    electionId: String(1) // Replace with actual election ID
-                })
+                    'Authorization': `Bearer ${authToken}`
+                }
             });
 
-            const data = await response.json();
-
-            if (response.ok) {
-                // Store the voting token and navigate to voting page
-                await AsyncStorage.setItem('votingToken', data.token);
-                // set election ID in storage if needed
-                await AsyncStorage.setItem('currentElectionId', String(1)); // Replace with actual election ID
-                router.push('/election/voting');
-            } else {
-                Alert.alert('Error', data.error || 'Failed to issue voting token');
+            if (!response.ok) {
+                throw new Error('Failed to fetch elections from the server.');
             }
-        } catch (error) {
-            console.error('Token issue error:', error);
-            Alert.alert('Error', 'Network error. Please try again.');
+
+            const data = await response.json();
+            setElections(data.elections || []);
+
+            Animated.parallel([
+                Animated.timing(fadeAnim, {
+                    toValue: 1,
+                    duration: 800,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(slideAnim, {
+                    toValue: 0,
+                    duration: 800,
+                    useNativeDriver: true,
+                })
+            ]).start();
+        } catch (err) {
+            console.error("Fetch elections error:", err);
+            setError(err.message || 'An unexpected error occurred.');
         } finally {
-            setIsLoading(false);
+            setLoading(false);
         }
     };
 
-    const renderVoteButton = () => (
-        <TouchableOpacity
-            style={[styles.primaryButton, isLoading && styles.disabledButton]}
-            onPress={issueVotingToken}
-            disabled={isLoading}
-        >
-            <MaterialCommunityIcons
-                name={isLoading ? "loading" : "ballot"}
-                size={24}
-                color="#fff"
-            />
-            <Text style={styles.primaryButtonText}>
-                {isLoading ? 'Loading...' : 'Cast Your Vote'}
-            </Text>
-        </TouchableOpacity>
-    );
-
     useEffect(() => {
-        Animated.parallel([
-            Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 800,
-                useNativeDriver: true,
-            }),
-            Animated.timing(slideAnim, {
-                toValue: 0,
-                duration: 800,
-                useNativeDriver: true,
-            }),
-        ]).start();
+        fetchElections();
     }, []);
 
-    const electionStats = {
-        totalPositions: 8,
-        totalCandidates: 24,
-        votingEnds: "March 15, 2025",
-        status: "Active",
-        totalVotes: 1560,
-        daysLeft: 7
+    const onRefresh = React.useCallback(() => {
+        setRefreshing(true);
+        fetchElections().then(() => setRefreshing(false));
+    }, []);
+
+    const getStatusInfo = (election) => {
+        const now = new Date();
+        const startDate = new Date(election.votingStart);
+        const endDate = new Date(election.votingEnd);
+
+        if (now < startDate) {
+            return { text: 'UPCOMING', color: '#ff6b00', bgColor: '#fff4e6', isPast: false };
+        }
+        if (now >= startDate && now <= endDate) {
+            return { text: 'ACTIVE', color: '#ff6b00', bgColor: '#fff4e6', isPast: false };
+        }
+        return { text: 'COMPLETED', color: '#94a3b8', bgColor: '#f1f5f9', isPast: true };
     };
 
-    const positions = [
-        { id: 1, title: "President", icon: "account-tie", candidates: 4, color: "#f97316" },
-        { id: 2, title: "Vice President", icon: "account-supervisor", candidates: 3, color: "#ef4444" },
-        { id: 3, title: "Secretary", icon: "notebook", candidates: 5, color: "#f59e0b" },
-        { id: 4, title: "Treasurer", icon: "cash", candidates: 3, color: "#10b981" },
-        { id: 5, title: "Events Director", icon: "calendar", candidates: 4, color: "#3b82f6" },
-        { id: 6, title: "Marketing Director", icon: "bullhorn", candidates: 2, color: "#8b5cf6" },
-        { id: 7, title: "Tech Lead", icon: "code-braces", candidates: 2, color: "#ec4899" },
-        { id: 8, title: "Social Media Manager", icon: "instagram", candidates: 1, color: "#6366f1" },
-    ];
+    const switchTab = (tab) => {
+        setActiveTab(tab);
+        Animated.spring(tabSlideAnim, {
+            toValue: tab === 'active' ? 0 : 1,
+            useNativeDriver: true,
+            tension: 50,
+            friction: 7,
+        }).start();
+    };
+
+    const getFilteredElections = () => {
+        return elections.filter(election => {
+            const status = getStatusInfo(election);
+            if (activeTab === 'active') {
+                return !status.isPast;
+            } else {
+                return status.isPast;
+            }
+        });
+    };
+
+    const filteredElections = getFilteredElections();
+
+    if (loading && !refreshing) {
+        return (
+            <LinearGradient colors={['#fff4e6', '#ffffff']} style={styles.gradient}>
+                <View style={styles.centered}>
+                    <View style={styles.loaderContainer}>
+                        <LinearGradient
+                            colors={['#ff6b00', '#ff8c00']}
+                            style={styles.loaderGradient}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                        >
+                            <ActivityIndicator size="large" color="#ffffff" />
+                        </LinearGradient>
+                    </View>
+                    <Text style={styles.loadingText}>Loading Elections...</Text>
+                    <Text style={styles.loadingSubtext}>Please wait while we fetch the data</Text>
+                </View>
+            </LinearGradient>
+        );
+    }
+
+    if (error) {
+        return (
+            <LinearGradient colors={['#fff4e6', '#ffffff']} style={styles.gradient}>
+                <View style={styles.centered}>
+                    <View style={styles.errorIconContainer}>
+                        <MaterialCommunityIcons name="alert-circle-outline" size={64} color="#ff6b00" />
+                    </View>
+                    <Text style={styles.errorTitle}>Oops! Something went wrong</Text>
+                    <Text style={styles.errorText}>{error}</Text>
+                    <TouchableOpacity style={styles.retryButton} onPress={fetchElections}>
+                        <LinearGradient
+                            colors={['#ff6b00', '#ff8c00']}
+                            style={styles.retryButtonGradient}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                        >
+                            <Feather name="refresh-cw" size={20} color="#ffffff" />
+                            <Text style={styles.retryButtonText}>Try Again</Text>
+                        </LinearGradient>
+                    </TouchableOpacity>
+                </View>
+            </LinearGradient>
+        );
+    }
 
     return (
-        <LinearGradient colors={['#fff7ed', '#fff', '#fff']} style={styles.gradient}>
-            <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                        <Feather name="arrow-left" size={24} color="#f97316" />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Club Elections 2025</Text>
-                    <View style={[styles.statusBadge, { backgroundColor: '#10b981' }]}>
-                        <Text style={styles.statusText}>ACTIVE</Text>
+        <LinearGradient colors={['#fff4e6', '#ffffff']} style={styles.gradient}>
+            <View style={styles.header}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                    <View style={styles.backButtonInner}>
+                        <Feather name="arrow-left" size={24} color="#ff6b00" />
                     </View>
+                </TouchableOpacity>
+                <View style={styles.headerTitleContainer}>
+                    <Text style={styles.headerTitle}>Elections</Text>
+                    <Text style={styles.headerSubtitle}>Vote for your leaders</Text>
                 </View>
+                <View style={styles.headerRight} />
+            </View>
 
-                <Animated.View
-                    style={[
-                        styles.content,
-                        {
+            <View style={styles.tabContainer}>
+                <View style={styles.tabWrapper}>
+                    <Animated.View
+                        style={[
+                            styles.tabIndicator,
+                            {
+                                transform: [{
+                                    translateX: tabSlideAnim.interpolate({
+                                        inputRange: [0, 1],
+                                        outputRange: [0, 170],
+                                    })
+                                }]
+                            }
+                        ]}
+                    >
+                        <LinearGradient
+                            colors={['#ff6b00', '#ff8c00']}
+                            style={styles.tabIndicatorGradient}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                        />
+                    </Animated.View>
+                    <TouchableOpacity
+                        style={styles.tab}
+                        onPress={() => switchTab('active')}
+                        activeOpacity={0.7}
+                    >
+                        <MaterialCommunityIcons
+                            name="vote"
+                            size={20}
+                            color={activeTab === 'active' ? '#ffffff' : '#94a3b8'}
+                        />
+                        <Text style={[
+                            styles.tabText,
+                            activeTab === 'active' && styles.tabTextActive
+                        ]}>
+                            Active & Upcoming
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.tab}
+                        onPress={() => switchTab('past')}
+                        activeOpacity={0.7}
+                    >
+                        <MaterialCommunityIcons
+                            name="history"
+                            size={20}
+                            color={activeTab === 'past' ? '#ffffff' : '#94a3b8'}
+                        />
+                        <Text style={[
+                            styles.tabText,
+                            activeTab === 'past' && styles.tabTextActive
+                        ]}>
+                            Past Elections
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            <ScrollView
+                style={styles.container}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={["#ff6b00"]}
+                        tintColor="#ff6b00"
+                    />
+                }
+            >
+                {filteredElections.length === 0 ? (
+                    <Animated.View
+                        style={[
+                            styles.emptyContainer,
+                            {
+                                opacity: fadeAnim,
+                                transform: [{ translateY: slideAnim }]
+                            }
+                        ]}
+                    >
+                        <View style={styles.emptyIconContainer}>
+                            <LinearGradient
+                                colors={['#ffedd5', '#fff4e6']}
+                                style={styles.emptyIconGradient}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                            >
+                                <MaterialCommunityIcons
+                                    name={activeTab === 'active' ? 'vote-outline' : 'history'}
+                                    size={64}
+                                    color="#ff6b00"
+                                />
+                            </LinearGradient>
+                        </View>
+                        <Text style={styles.emptyTitle}>
+                            {activeTab === 'active' ? 'No Active Elections' : 'No Past Elections'}
+                        </Text>
+                        <Text style={styles.emptyText}>
+                            {activeTab === 'active'
+                                ? 'Check back later for upcoming elections and make your voice heard!'
+                                : 'No completed elections to show at the moment.'}
+                        </Text>
+                    </Animated.View>
+                ) : (
+                    <Animated.View
+                        style={{
                             opacity: fadeAnim,
                             transform: [{ translateY: slideAnim }]
-                        }
-                    ]}
-                >
-                    <View style={styles.tabs}>
-                        <TouchableOpacity
-                            style={[styles.tab, activeTab === 'overview' && styles.activeTab]}
-                            onPress={() => setActiveTab('overview')}
-                        >
-                            <Text style={[styles.tabText, activeTab === 'overview' && styles.activeTabText]}>Overview</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.tab, activeTab === 'positions' && styles.activeTab]}
-                            onPress={() => setActiveTab('positions')}
-                        >
-                            <Text style={[styles.tabText, activeTab === 'positions' && styles.activeTabText]}>Positions</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.tab, activeTab === 'results' && styles.activeTab]}
-                            onPress={() => setActiveTab('results')}
-                        >
-                            <Text style={[styles.tabText, activeTab === 'results' && styles.activeTabText]}>Results</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    {activeTab === 'overview' && (
-                        <>
-                            <View style={styles.heroSection}>
-                                <View style={styles.electionIcon}>
-                                    <MaterialCommunityIcons name="ballot" size={36} color="#f97316" />
-                                </View>
-                                <Text style={styles.title}>ClubSync Elections 2025</Text>
-                                <Text style={styles.subtitle}>Shape the future of our community</Text>
-                                <Text style={styles.description}>
-                                    Cast your vote for the upcoming Club Elections. Choose your preferred candidates
-                                    and make your voice heard in shaping our club's future.
+                        }}
+                    >
+                        <View style={styles.statsContainer}>
+                            <View style={styles.statCard}>
+                                <LinearGradient
+                                    colors={['#ff6b00', '#ff8c00']}
+                                    style={styles.statIconContainer}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                >
+                                    <MaterialCommunityIcons name="vote" size={24} color="#ffffff" />
+                                </LinearGradient>
+                                <Text style={styles.statNumber}>{filteredElections.length}</Text>
+                                <Text style={styles.statLabel}>
+                                    {activeTab === 'active' ? 'Active/Upcoming' : 'Completed'}
                                 </Text>
                             </View>
-
-                            <View style={styles.statsContainer}>
-                                <View style={styles.statsGrid}>
-                                    <View style={styles.statCard}>
-                                        <MaterialCommunityIcons name="briefcase-variant" size={24} color="#f97316" />
-                                        <Text style={styles.statNumber}>{electionStats.totalPositions}</Text>
-                                        <Text style={styles.statLabel}>Positions</Text>
-                                    </View>
-                                    <View style={styles.statCard}>
-                                        <MaterialCommunityIcons name="account-group" size={24} color="#f97316" />
-                                        <Text style={styles.statNumber}>{electionStats.totalCandidates}</Text>
-                                        <Text style={styles.statLabel}>Candidates</Text>
-                                    </View>
-                                    <View style={styles.statCard}>
-                                        <Feather name="users" size={24} color="#f97316" />
-                                        <Text style={styles.statNumber}>{electionStats.totalVotes}</Text>
-                                        <Text style={styles.statLabel}>Votes Cast</Text>
-                                    </View>
-                                    <View style={styles.statCard}>
-                                        <Feather name="clock" size={24} color="#f97316" />
-                                        <Text style={styles.statNumber}>{electionStats.daysLeft}</Text>
-                                        <Text style={styles.statLabel}>Days Left</Text>
-                                    </View>
-                                </View>
-
-                                <View style={styles.timelineCard}>
-                                    <View style={styles.timelineHeader}>
-                                        <Feather name="clock" size={20} color="#f97316" />
-                                        <Text style={styles.timelineTitle}>Voting Deadline</Text>
-                                    </View>
-                                    <Text style={styles.timelineDate}>{electionStats.votingEnds}</Text>
-                                    <View style={styles.progressBar}>
-                                        <View style={[styles.progressFill, { width: '65%' }]} />
-                                    </View>
-                                    <Text style={styles.progressText}>65% of members have voted</Text>
-                                </View>
-                            </View>
-
-                            <View style={styles.actionSection}>
-                                {renderVoteButton()}
-                                <TouchableOpacity
-                                    style={styles.secondaryButton}
-                                    onPress={() => router.push('/election/candidates')}
+                            <View style={styles.statCard}>
+                                <LinearGradient
+                                    colors={['#ff8c00', '#ffa500']}
+                                    style={styles.statIconContainer}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
                                 >
-                                    <Feather name="users" size={20} color="#f97316" />
-                                    <Text style={styles.secondaryButtonText}>Meet the Candidates</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </>
-                    )}
-
-                    {activeTab === 'positions' && (
-                        <View style={styles.positionsContainer}>
-                            <Text style={styles.sectionTitle}>Available Positions</Text>
-                            <Text style={styles.sectionSubtitle}>Select a position to view candidates</Text>
-
-                            {positions.map(position => (
-                                <TouchableOpacity
-                                    key={position.id}
-                                    style={styles.positionCard}
-                                    onPress={() => router.push(`/election/position/${position.id}`)}
-                                >
-                                    <LinearGradient
-                                        colors={[position.color, `${position.color}90`]}
-                                        style={styles.positionIcon}
-                                    >
-                                        <MaterialCommunityIcons name={position.icon} size={24} color="#fff" />
-                                    </LinearGradient>
-                                    <View style={styles.positionInfo}>
-                                        <Text style={styles.positionTitle}>{position.title}</Text>
-                                        <Text style={styles.positionCandidates}>{position.candidates} candidates</Text>
-                                    </View>
-                                    <Feather name="chevron-right" size={24} color="#9ca3af" />
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    )}
-
-                    {activeTab === 'results' && (
-                        <View style={styles.resultsContainer}>
-                            <Text style={styles.sectionTitle}>Election Results</Text>
-                            <Text style={styles.sectionSubtitle}>Available after voting closes on {electionStats.votingEnds}</Text>
-
-                            <View style={styles.resultsPlaceholder}>
-                                <MaterialCommunityIcons name="poll" size={60} color="#d1d5db" />
-                                <Text style={styles.resultsPlaceholderText}>Results will appear here once voting is complete</Text>
+                                    <MaterialCommunityIcons name="account-group" size={24} color="#ffffff" />
+                                </LinearGradient>
+                                <Text style={styles.statNumber}>
+                                    {filteredElections.reduce((sum, e) => sum + e.positions.length, 0)}
+                                </Text>
+                                <Text style={styles.statLabel}>Total Positions</Text>
                             </View>
                         </View>
-                    )}
-                </Animated.View>
+
+                        {filteredElections.map((election, index) => {
+                            const status = getStatusInfo(election);
+                            return (
+                                <TouchableOpacity
+                                    key={election.id}
+                                    style={styles.card}
+                                    onPress={() => router.push(`/election/${election.id}`)}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={styles.cardGradient}>
+                                        <View style={styles.cardContent}>
+                                            <View style={styles.cardHeader}>
+                                                <View style={styles.cardTitleContainer}>
+                                                    <Text style={styles.cardTitle}>{election.title}</Text>
+                                                    <View style={[styles.statusBadge, { backgroundColor: status.bgColor }]}>
+                                                        <View style={[styles.statusDot, { backgroundColor: status.color }]} />
+                                                        <Text style={[styles.statusText, { color: status.color }]}>
+                                                            {status.text}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                            </View>
+
+                                            <View style={styles.clubContainer}>
+                                                <View style={styles.clubIconWrapper}>
+                                                    <MaterialCommunityIcons name="account-group" size={14} color="#ff6b00" />
+                                                </View>
+                                                <Text style={styles.cardClub}>{election.club.name}</Text>
+                                            </View>
+
+                                            <View style={styles.divider} />
+
+                                            <View style={styles.cardFooter}>
+                                                <View style={styles.footerItem}>
+                                                    <View style={styles.iconContainer}>
+                                                        <Feather name="calendar" size={16} color="#ff6b00" />
+                                                    </View>
+                                                    <View>
+                                                        <Text style={styles.footerLabel}>Ends on</Text>
+                                                        <Text style={styles.footerText}>
+                                                            {new Date(election.votingEnd).toLocaleDateString('en-US', {
+                                                                month: 'short',
+                                                                day: 'numeric',
+                                                                year: 'numeric'
+                                                            })}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                                <View style={styles.footerItem}>
+                                                    <View style={styles.iconContainer}>
+                                                        <Feather name="users" size={16} color="#ff6b00" />
+                                                    </View>
+                                                    <View>
+                                                        <Text style={styles.footerLabel}>Positions</Text>
+                                                        <Text style={styles.footerText}>
+                                                            {election.positions.length} Available
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                            </View>
+
+                                            <TouchableOpacity
+                                                style={styles.cardAction}
+                                                onPress={() => router.push(`/election/${election.id}`)}
+                                                activeOpacity={0.8}
+                                            >
+                                                <LinearGradient
+                                                    colors={['#ff6b00', '#ff8c00']}
+                                                    style={styles.cardActionGradient}
+                                                    start={{ x: 0, y: 0 }}
+                                                    end={{ x: 1, y: 0 }}
+                                                >
+                                                    <Text style={styles.cardActionText}>View Details</Text>
+                                                    <Feather name="arrow-right" size={18} color="#ffffff" />
+                                                </LinearGradient>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        })}
+                        <View style={styles.bottomPadding} />
+                    </Animated.View>
+                )}
             </ScrollView>
         </LinearGradient>
     );
-}
+};
 
 const styles = StyleSheet.create({
-    gradient: { flex: 1 },
-    container: { flex: 1 },
+    gradient: {
+        flex: 1,
+    },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingTop: 50,
         paddingHorizontal: 20,
+        paddingTop: 60,
         paddingBottom: 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderBottomWidth: 1,
-        borderBottomColor: '#f3f4f6',
+        backgroundColor: 'transparent',
     },
     backButton: {
-        padding: 8,
-        borderRadius: 8,
-        backgroundColor: '#fff',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
+        width: 44,
+        height: 44,
     },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#222',
-        flex: 1,
-        textAlign: 'center',
-        marginHorizontal: 16,
-    },
-    statusBadge: {
-        backgroundColor: '#10b981',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    statusText: {
-        color: '#fff',
-        fontSize: 12,
-        fontWeight: 'bold',
-    },
-    content: {
-        padding: 20,
-    },
-    tabs: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 24,
-        backgroundColor: '#f3f4f6',
-        borderRadius: 12,
-        padding: 4,
-    },
-    tab: {
-        flex: 1,
-        paddingVertical: 10,
-        borderRadius: 8,
-        alignItems: 'center',
-    },
-    activeTab: {
-        backgroundColor: '#fff',
-        shadowColor: '#f97316',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    tabText: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: '#6b7280',
-    },
-    activeTabText: {
-        color: '#f97316',
-        fontWeight: '600',
-    },
-    heroSection: {
-        alignItems: 'center',
-        marginBottom: 32,
-    },
-    electionIcon: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: '#fff',
-        alignItems: 'center',
+    backButtonInner: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#ffffff',
         justifyContent: 'center',
-        marginBottom: 16,
-        shadowColor: '#000',
+        alignItems: 'center',
+        shadowColor: '#ff6b00',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.15,
         shadowRadius: 8,
         elevation: 4,
     },
-    title: {
+    headerTitleContainer: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    headerTitle: {
         fontSize: 28,
-        fontWeight: 'bold',
-        color: '#222',
-        textAlign: 'center',
-        marginBottom: 4,
+        fontWeight: '700',
+        color: '#1f2937',
+        letterSpacing: -0.5,
     },
-    subtitle: {
-        fontSize: 16,
-        color: '#f97316',
-        fontWeight: '600',
-        textAlign: 'center',
-        marginBottom: 16,
-    },
-    description: {
-        fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-        lineHeight: 24,
-        paddingHorizontal: 16,
-    },
-    statsContainer: {
-        marginBottom: 24,
-    },
-    statsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        marginBottom: 16,
-    },
-    statCard: {
-        width: '48%',
-        backgroundColor: '#fff',
-        padding: 16,
-        borderRadius: 16,
-        alignItems: 'center',
-        marginBottom: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-    },
-    statNumber: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#222',
-        marginTop: 8,
-    },
-    statLabel: {
-        fontSize: 14,
+    headerSubtitle: {
+        fontSize: 12,
         color: '#6b7280',
-        marginTop: 4,
+        marginTop: 2,
     },
-    timelineCard: {
-        backgroundColor: '#fff',
-        padding: 20,
+    headerRight: {
+        width: 44,
+    },
+    tabContainer: {
+        paddingHorizontal: 20,
+        paddingBottom: 16,
+    },
+    tabWrapper: {
+        backgroundColor: '#f1f5f9',
         borderRadius: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-    },
-    timelineHeader: {
+        padding: 4,
         flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 8,
+        position: 'relative',
     },
-    timelineTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#222',
-        marginLeft: 8,
-    },
-    timelineDate: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#f97316',
-        marginBottom: 12,
-    },
-    progressBar: {
-        height: 8,
-        backgroundColor: '#e5e7eb',
-        borderRadius: 4,
-        marginBottom: 8,
+    tabIndicator: {
+        position: 'absolute',
+        top: 4,
+        left: 4,
+        width: 162,
+        height: 44,
+        borderRadius: 12,
         overflow: 'hidden',
     },
-    progressFill: {
-        height: '100%',
-        backgroundColor: '#f97316',
-        borderRadius: 4,
-    },
-    progressText: {
-        fontSize: 14,
-        color: '#6b7280',
-    },
-    featureCard: {
-        width: '100%',
-        backgroundColor: '#fff',
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    featureIcon: {
-        marginRight: 12,
-    },
-    featureTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#222',
-    },
-    featureDesc: {
-        fontSize: 14,
-        color: '#6b7280',
-        marginLeft: 'auto',
-        textAlign: 'right',
+    tabIndicatorGradient: {
         flex: 1,
+        shadowColor: '#ff6b00',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 3,
     },
-    actionSection: {
-        marginBottom: 24,
-    },
-    primaryButton: {
+    tab: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#f97316',
-        borderRadius: 16,
-        paddingVertical: 18,
+        paddingVertical: 12,
+        gap: 8,
+        zIndex: 1,
+    },
+    tabText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#94a3b8',
+    },
+    tabTextActive: {
+        color: '#ffffff',
+    },
+    container: {
+        flex: 1,
+        paddingHorizontal: 20,
+    },
+    centered: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 40,
+    },
+    loaderContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        overflow: 'hidden',
+        marginBottom: 24,
+    },
+    loaderGradient: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        fontSize: 20,
+        fontWeight: '600',
+        color: '#1f2937',
+        marginTop: 8,
+    },
+    loadingSubtext: {
+        fontSize: 14,
+        color: '#6b7280',
+        marginTop: 8,
+        textAlign: 'center',
+    },
+    errorIconContainer: {
+        marginBottom: 24,
+    },
+    errorTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#1f2937',
         marginBottom: 12,
-        shadowColor: '#f97316',
+        textAlign: 'center',
+    },
+    errorText: {
+        fontSize: 16,
+        color: '#6b7280',
+        textAlign: 'center',
+        marginBottom: 32,
+        lineHeight: 24,
+    },
+    retryButton: {
+        borderRadius: 12,
+        overflow: 'hidden',
+        shadowColor: '#ff6b00',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 4,
     },
-    primaryButtonText: {
-        color: '#fff',
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginLeft: 8,
-    },
-    secondaryButton: {
+    retryButtonGradient: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        paddingVertical: 18,
-        borderWidth: 2,
-        borderColor: '#f97316',
+        paddingHorizontal: 32,
+        paddingVertical: 16,
+        gap: 8,
     },
-    secondaryButtonText: {
-        color: '#f97316',
+    retryButtonText: {
+        color: '#ffffff',
         fontSize: 16,
         fontWeight: '600',
         marginLeft: 8,
     },
-    disabledButton: {
-        opacity: 0.6,
-    },
-    positionsContainer: {
-        marginBottom: 24,
-    },
-    sectionTitle: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: '#222',
-        marginBottom: 8,
-    },
-    sectionSubtitle: {
-        fontSize: 14,
-        color: '#6b7280',
-        marginBottom: 16,
-    },
-    positionCard: {
+    statsContainer: {
         flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 1,
+        gap: 12,
+        marginBottom: 20,
     },
-    positionIcon: {
+    statCard: {
+        flex: 1,
+        backgroundColor: '#ffffff',
+        borderRadius: 20,
+        padding: 20,
+        alignItems: 'center',
+        shadowColor: '#ff6b00',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 3,
+    },
+    statIconContainer: {
         width: 48,
         height: 48,
-        borderRadius: 12,
-        alignItems: 'center',
+        borderRadius: 24,
         justifyContent: 'center',
-        marginRight: 16,
+        alignItems: 'center',
+        marginBottom: 12,
     },
-    positionInfo: {
-        flex: 1,
-    },
-    positionTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#222',
+    statNumber: {
+        fontSize: 28,
+        fontWeight: '700',
+        color: '#1f2937',
         marginBottom: 4,
     },
-    positionCandidates: {
+    statLabel: {
+        fontSize: 12,
+        color: '#6b7280',
+        textAlign: 'center',
+    },
+    card: {
+        marginBottom: 16,
+        borderRadius: 24,
+        overflow: 'hidden',
+        shadowColor: '#ff6b00',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.15,
+        shadowRadius: 16,
+        elevation: 6,
+    },
+    cardGradient: {
+        backgroundColor: '#ffffff',
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: '#ffedd5',
+    },
+    cardContent: {
+        padding: 20,
+    },
+    cardHeader: {
+        marginBottom: 12,
+    },
+    cardTitleContainer: {
+        gap: 8,
+    },
+    cardTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1f2937',
+        marginBottom: 8,
+        lineHeight: 26,
+    },
+    statusBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        gap: 6,
+    },
+    statusDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    statusText: {
+        fontSize: 12,
+        fontWeight: '600',
+        letterSpacing: 0.5,
+    },
+    clubContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 16,
+    },
+    clubIconWrapper: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: '#fff4e6',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    cardClub: {
         fontSize: 14,
         color: '#6b7280',
+        fontWeight: '500',
     },
-    resultsContainer: {
-        marginBottom: 24,
+    divider: {
+        height: 1,
+        backgroundColor: '#f3f4f6',
+        marginBottom: 16,
     },
-    resultsPlaceholder: {
-        backgroundColor: '#fff',
-        padding: 40,
-        borderRadius: 16,
+    cardFooter: {
+        flexDirection: 'row',
+        gap: 20,
+        marginBottom: 16,
+    },
+    footerItem: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    iconContainer: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#fff4e6',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    footerLabel: {
+        fontSize: 11,
+        color: '#9ca3af',
+        marginBottom: 2,
+        fontWeight: '500',
+    },
+    footerText: {
+        fontSize: 13,
+        color: '#1f2937',
+        fontWeight: '600',
+    },
+    cardAction: {
+        marginTop: 16,
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    cardActionGradient: {
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 1,
+        gap: 8,
+        paddingVertical: 14,
     },
-    resultsPlaceholderText: {
-        fontSize: 16,
-        color: '#9ca3af',
+    cardActionText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#ffffff',
+    },
+    emptyContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 80,
+        paddingHorizontal: 40,
+    },
+    emptyIconContainer: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        overflow: 'hidden',
+        marginBottom: 24,
+    },
+    emptyIconGradient: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    emptyTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#1f2937',
+        marginBottom: 12,
         textAlign: 'center',
-        marginTop: 16,
+    },
+    emptyText: {
+        fontSize: 16,
+        color: '#6b7280',
+        textAlign: 'center',
+        lineHeight: 24,
+    },
+    bottomPadding: {
+        height: 40,
     },
 });
+
+export default ElectionListPage;
