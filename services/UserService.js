@@ -30,7 +30,12 @@ export const UserService = {
       
       // Get fresh data if no cache or cache expired
       const token = await AsyncStorage.getItem('token');
-      if (!token) throw new Error('User not authenticated');
+      
+      // Return default non-organizer data if no token instead of throwing error
+      if (!token) {
+        console.log('User not authenticated, returning default non-organizer status');
+        return { isOrganizer: false, events: [] };
+      }
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
